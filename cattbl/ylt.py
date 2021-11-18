@@ -183,7 +183,7 @@ class YearLossTable:
 
         return losses
 
-    def to_ep_summary(self, return_periods, **kawrgs):
+    def to_ep_summary(self, return_periods, **kwargs):
         """Get loss at summary return periods and return a pandas Series
 
         :returns: [pands.Series] with index 'ReturnPeriod' and Losses at each

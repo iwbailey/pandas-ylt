@@ -75,20 +75,77 @@ class TestYELTprops(unittest.TestCase):
     """Test we can access various properties of the YELT"""
     def setUp(self) -> None:
         """Initialise test variables"""
-        # TODO: Read the YELT from file
-        pass
 
-# TODO: Test the number of years is okay
+        # Read the YELT from file
+        self.test_yelt = yelt.from_csv(IFILE_TEST_YELT,
+                                       n_yrs=TEST_YELT_N_YEARS)
 
-# TODO: Test we can calculate an AAL
+    def test_n_yrs(self):
+        """Test the number of years is okay"""
+        self.assertEqual(self.test_yelt.yelt.n_yrs, TEST_YELT_N_YEARS)
 
-# TODO: Test we can get
+    def test_aal(self):
+        """Test we can calculate an AAL"""
 
-# TODO: Test we can convert to a ylt
+        aal = self.test_yelt.yelt.aal
+        self.assertGreater(aal, 0.0)
+        self.assertAlmostEqual(aal,
+                               self.test_yelt.sum() / TEST_YELT_N_YEARS)
 
-# TODO: Test we get the EEF curve
+    def test_freq(self):
+        """Test we can calculate the frequency of a loss"""
+        f0 = self.test_yelt.yelt.freq0
+
+        self.assertGreater(f0, 0.0)
+        self.assertAlmostEqual(f0,
+                               (self.test_yelt > 0).sum() / TEST_YELT_N_YEARS)
+
+
+class TestYELTmethods(unittest.TestCase):
+    """Test the various methods that act on a YELT via the accessor"""
+    def setUp(self) -> None:
+        """Initialize test variables"""
+
+        # Read the YELT from file
+        self.test_yelt = yelt.from_csv(IFILE_TEST_YELT,
+                                       n_yrs=TEST_YELT_N_YEARS)
+
+    def test_to_ylt(self):
+        """Test we can convert to a ylt"""
+
+        this_ylt = self.test_yelt.yelt.to_ylt()
+
+        # Check it is a valid YLT
+        self.assertTrue(this_ylt.ylt.is_valid())
+
+        # Check the AAL are equal
+        self.assertAlmostEqual(self.test_yelt.yelt.aal,
+                               this_ylt.ylt.aal)
+
+    def test_to_occ_ylt(self):
+        """Test we can convert to a year occurrence loss table"""
+
+        this_ylt = self.test_yelt.yelt.to_ylt(is_occurrence=True)
+
+        # Check it is a valid YLT
+        self.assertTrue(this_ylt.ylt.is_valid())
+
+        # TODO: Check all values are less or equal than the annual
+
+    def test_exceedance_freqs(self):
+        """Test we can calculate an EEF curve"""
+        # TODO: Test we get the EEF curve
+
+        eef = self.test_yelt.yelt.exfreq()
+
+        # Test the same length
+        self.assertEqual(len(eef), len(self.test_yelt))
+
+        # TODO: test the frequency
 
 # TODO: Test we can handle an EEF curve with negative loss
+
+# TODO: Test severity
 
 
 if __name__ == '__main__':

@@ -138,7 +138,8 @@ class YearLossTable:
                       .reindex(range(1, self.n_yrs + 1), fill_value=0.0))
 
         # Create the dataframe by combining loss with exprob
-        ep_curve = pd.concat([with_zeros, with_zeros.ylt.exprob(**kwargs)], axis=1)
+        ep_curve = pd.concat([with_zeros, with_zeros.ylt.exprob(**kwargs)],
+                             axis=1)
 
         # Sort from largest to smallest loss
         ep_curve = ep_curve.reset_index().sort_values(
@@ -154,7 +155,7 @@ class YearLossTable:
         return ep_curve
 
     def loss_at_rp(self, return_periods, **kwargs):
-        """Interpolate the year loss table to get losses at specific return periods
+        """Interpolate the year loss table for losses at specific return periods
 
         :param return_periods: [numpy.array] should be ordered from largest to
         smallest. A list will also work.
@@ -162,8 +163,9 @@ class YearLossTable:
         :returns: [numpy.array] losses at the corresponding return periods
 
         The interpolation is done on exceedance probability.
-        Values below the smallest exceedance probability in the PLT get the max loss
-        Values above the largest exceedance probability in the PLT get zero
+        Values below the smallest exceedance probability get the max loss
+        Values above the largest exceedance probability get zero
+        Invalid exceedance return periods get NaN
         """
 
         # Get the full EP curve
@@ -195,12 +197,12 @@ class YearLossTable:
                          name='Loss')
 
 
-def from_cols(Year, Loss, n_yrs):
+def from_cols(year, loss, n_yrs):
     """Create a panadas Series  with year loss table from input args
 
-    :param Year: [numpy.Array] an array of integer years
+    :param year: [numpy.Array] an array of integer years
 
-    :param Loss: [numpy.Array]
+    :param loss: [numpy.Array]
 
     :param n_yrs: [int]
 
@@ -213,7 +215,7 @@ def from_cols(Year, Loss, n_yrs):
         'MaxLoss': [float] maximum event loss
     """
 
-    ylt = pd.Series(Loss, name='Loss', index=pd.Index(Year, name='Year'))
+    ylt = pd.Series(loss, name='Loss', index=pd.Index(year, name='Year'))
 
     # Store the number of years as meta-data
     ylt.attrs['n_yrs'] = n_yrs

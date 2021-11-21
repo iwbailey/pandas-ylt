@@ -32,7 +32,7 @@ def main():
     yelt = pd.DataFrame({
         'Year': event_times.astype(int),
         'EventID': range(1, n_events + 1),
-        'DayOfYear': 1 + (365 * np.mod(event_times, 1.0)),
+        'DayOfYear': 1 + np.int64((365 * np.mod(event_times, 1.0))),
         'Loss': losses,
     })
 

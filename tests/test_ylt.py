@@ -4,6 +4,7 @@ from cattbl import ylt
 import pandas as pd
 import numpy as np
 
+
 class TestYLT(unittest.TestCase):
     def setUp(self) -> None:
         """Define a basic ylt for testing"""
@@ -15,8 +16,8 @@ class TestYLT(unittest.TestCase):
 
     def get_default_ylt(self):
         ylt_series = ylt.from_cols(
-            Year=self.ylt_in['Year'].values,
-            Loss=self.ylt_in['Loss'].values,
+            year=self.ylt_in['Year'].values,
+            loss=self.ylt_in['Loss'].values,
             n_yrs=self.n_years,
         )
         return ylt_series
@@ -57,9 +58,9 @@ class TestYLT(unittest.TestCase):
         are present
         """
         # Test a more complex example with negatives and zeros
-        ylt2 = ylt.from_cols(Year=[1, 2, 3, 4, 5], Loss=[-1, 0, 0, 2, 3],
+        ylt2 = ylt.from_cols(year=[1, 2, 3, 4, 5], loss=[-1, 0, 0, 2, 3],
                              n_yrs=6)
-        self.assertAlmostEqual(ylt2.ylt.prob_of_a_loss, 2 / 6 )
+        self.assertAlmostEqual(ylt2.ylt.prob_of_a_loss, 2 / 6)
 
     def test_cprob(self):
         """Test calculation of cumulative distribution"""
@@ -85,7 +86,7 @@ class TestYLT(unittest.TestCase):
                     .iloc[1:]
                     )
         self.assertTrue((diffprob >= 0.0).all(),
-                        msg="Expected cumul probs to increase as loss increases")
+                        msg="Cumul probs don't increase as loss increases")
 
     def test_calc_ecdf(self):
         """Test calculation of the empirical cdf"""
@@ -102,18 +103,18 @@ class TestYLT(unittest.TestCase):
                         'Expected all calculated cprobs to be in ecdf')
 
         # Check monotonically increasing
-        self.assertTrue((ecdf['Loss'].is_monotonic_increasing) &
-                        (ecdf['CProb'].is_monotonic_increasing))
+        self.assertTrue(ecdf['Loss'].is_monotonic_increasing &
+                        ecdf['CProb'].is_monotonic_increasing)
 
     def test_ecdf_neg_losses(self):
         # Check a case with negative losses
-        ylt2 = ylt.from_cols(Year=[1, 2, 3, 4, 5], Loss=[-1, 0, 0, 2, 3],
+        ylt2 = ylt.from_cols(year=[1, 2, 3, 4, 5], loss=[-1, 0, 0, 2, 3],
                              n_yrs=6)
         ecdf = ylt2.ylt.to_ecdf()
 
         # Check monotonically increasing
-        self.assertTrue((ecdf['Loss'].is_monotonic_increasing) &
-                        (ecdf['CProb'].is_monotonic_increasing))
+        self.assertTrue(ecdf['Loss'].is_monotonic_increasing &
+                        ecdf['CProb'].is_monotonic_increasing)
 
     def test_ecdf_keep_years(self):
         """Test the ECDF returns the years when requested"""
@@ -172,12 +173,15 @@ class TestYLT(unittest.TestCase):
         loss_ep_v2 = ylt_series.ylt.to_ep_curve(keep_years=True)
 
         self.assertTrue(loss_ep.reset_index(drop=True).equals(
-            loss_ep_v2[loss_ep.columns].drop_duplicates().reset_index(drop=True)))
+                (loss_ep_v2[loss_ep.columns]
+                 .drop_duplicates()
+                 .reset_index(drop=True)
+                 )
+        ))
 
         # Check the year loss combinations are the same as input
         self.assertTrue((loss_ep_v2.set_index('Year')['Loss']
                          .subtract(ylt_series, fill_value=0.0) < 1e-8).all())
-
 
     def test_rp_loss(self):
         """Check return period interpolation"""

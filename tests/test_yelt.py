@@ -3,6 +3,7 @@ import os
 import pandas as pd
 
 from cattbl import yelt
+from cattbl.ylt import YearLossTable
 
 IFILE_TEST_YELT = os.path.join(os.path.dirname(__file__),
                                "_data",
@@ -116,7 +117,7 @@ class TestYELTmethods(unittest.TestCase):
         this_ylt = self.test_yelt.yelt.to_ylt()
 
         # Check it is a valid YLT
-        self.assertTrue(this_ylt.ylt.is_valid())
+        self.assertTrue(this_ylt.ylt.is_valid)
 
         # Check the AAL are equal
         self.assertAlmostEqual(self.test_yelt.yelt.aal,
@@ -128,20 +129,67 @@ class TestYELTmethods(unittest.TestCase):
         this_ylt = self.test_yelt.yelt.to_ylt(is_occurrence=True)
 
         # Check it is a valid YLT
-        self.assertTrue(this_ylt.ylt.is_valid())
+        self.assertTrue(this_ylt.ylt.is_valid)
 
-        # TODO: Check all values are less or equal than the annual
+        # Check all values are less or equal than the annual
+        agg_ylt = self.test_yelt.yelt.to_ylt()
+        diff_ylt = agg_ylt.subtract(this_ylt)
+        self.assertGreaterEqual(diff_ylt.min(), 0.0)
+        self.assertGreater(diff_ylt.max(), 0.0)
 
     def test_exceedance_freqs(self):
         """Test we can calculate an EEF curve"""
-        # TODO: Test we get the EEF curve
 
         eef = self.test_yelt.yelt.exfreq()
 
         # Test the same length
         self.assertEqual(len(eef), len(self.test_yelt))
 
-        # TODO: test the frequency
+        # Test the max frequency is the same as the freq of loss
+        self.assertAlmostEqual(eef.max(), self.test_yelt.freq0)
+
+        # Check all indices are matching
+        self.assertTrue(self.test_yelt.index.equals(eef.index))
+
+        # Check the probabilities are all within range
+        self.assertTrue((eef > 0).all())
+
+        # Check the frequencies are decreasing as losses increase
+        diffprob = (pd.concat([self.this_yelt, eef], axis=1)
+                    .sort_values('Loss')['ExFreq']
+                    .diff()
+                    .iloc[1:]
+                    )
+        self.assertTrue((diffprob <= 0.0).all())
+
+    def test_layer_aal(self):
+        """Test we can calculate the loss in range"""
+
+        # Test calculating the loss in the full range is the same as AAL
+        self.assertEqual(self.test_yelt.yelt.layer_aal(),
+                         self.test_yelt.yelt.aal)
+
+        # Test an upper layer reduces the loss
+        loss1 = 2.0 * self.test_yelt.min()
+        loss2 = 0.9 * self.test_yelt.max() - loss1
+        aal_upper = self.test_yelt.yelt.layer_aal(limit=loss2)
+        self.assertLess(aal_upper, self.test_yelt.yelt.aal)
+
+        # Test a lower layer reduces the loss
+        aal_lower = self.test_yelt.yelt.layer_aal(xs=loss1)
+        self.assertLess(aal_lower, self.test_yelt.yelt.aal)
+
+        # Test both lower and upper is lowest of all
+        aal_mid = self.test_yelt.yelt.layer_aal(xs=loss1, limit=loss2)
+        self.assertLess(aal_mid, aal_upper)
+        self.assertLess(aal_mid, aal_lower)
+
+        # Test reducing the number of losses reduces the aal
+        aal_mid_1loss = self.test_yelt.yelt.layer_aal(xs=loss1, limit=loss2,
+                                                      n_loss=1)
+
+        self.assertLess(aal_mid_1loss, aal_mid)
+
 
 # TODO: Test we can handle an EEF curve with negative loss
 

@@ -8,7 +8,7 @@ COL_YEAR = 'Year'
 COL_EVENT = 'EventID'
 COL_DAY = 'DayOfYear'
 COL_LOSS = 'Loss'
-INDEX_NAMES = [COL_YEAR, COL_EVENT, COL_DAY]
+INDEX_NAMES = [COL_YEAR, COL_DAY, COL_EVENT]
 
 
 @pd.api.extensions.register_series_accessor("yelt")
@@ -63,6 +63,71 @@ class YearEventLossTable:
         """Check we can pass the initialisation checks"""
         return True
 
+    @property
+    def n_yrs(self):
+        """Return the number of years for the ylt"""
+        return self._obj.attrs['n_yrs']
+
+    @property
+    def aal(self):
+        """Return the average annual loss"""
+        return self._obj.sum() / self.n_yrs
+
+    @property
+    def freq0(self):
+        """Frequency of a loss greater than zero"""
+        return (self._obj > 0).sum() / self.n_yrs
+
+    def to_ylt(self, is_occurrence=False):
+        """Convert to a YLT
+
+        If is_occurrence return the max loss in a year. Otherwise return the
+        summed loss in a year.
+        """
+
+        yrgroup = self._obj.groupby('Year')
+
+        if is_occurrence:
+            return yrgroup.max()
+        else:
+            return yrgroup.sum()
+
+    def exfreq(self, **kwargs):
+        """For each loss calculate the frequency >= loss"""
+        return (self._obj.rank(ascending=False, method='min', **kwargs)
+                .divide(self.n_yrs)
+                .rename('ExFreq')
+                )
+
+    def apply_layer(self, limit=None, xs=0.0, n_loss=None, is_franchise=False):
+
+        assert xs >= 0 , "Lower loss must be >= 0"
+
+        # Apply layer attachment and limit
+        layer_losses = (self._obj
+                        .subtract(xs).clip(lower=0.0)
+                        .clip(upper=limit)
+                        )
+        layer_losses = layer_losses.loc[layer_losses > 0.0]
+
+        if is_franchise:
+            layer_losses += xs
+
+        # Apply occurrence limit
+        if n_loss is not None:
+            layer_losses = (layer_losses
+                            .sort_index(level=[COL_YEAR, COL_DAY, COL_EVENT])
+                            .groupby(COL_YEAR).head(n_loss)
+                            )
+
+        return layer_losses
+
+    def layer_aal(self, **kwargs):
+        """Calculate the AAL within a layer"""
+
+        layer_losses = self.apply_layer(**kwargs)
+
+        return layer_losses.sum() / self.n_yrs
 
 def from_cols(year, eventid, dayofyear, loss, n_yrs):
     """Create a pandas Series YELT (Year Event Loss Table) from its columns

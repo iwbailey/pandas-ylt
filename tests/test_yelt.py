@@ -224,6 +224,32 @@ class TestYELTmethods(unittest.TestCase):
 
         self.assertLess(aal_mid_1loss, aal_mid)
 
+    def test_severity_curve(self):
+        """Test we can calculate a severity curve"""
+
+        # Max prob should be 1
+
+        # Min prob should be 1 / num_losses
+
+        # cumul prob should always increase as loss increases
+
+        pass
+
+    def test_ef_curve(self, keep_index=False):
+        """Check the EF curve calculation"""
+
+        # Get the EP curve
+        loss_ef = self.test_yelt.yelt.to_ef_curve(keep_index)
+
+        # Check Exprob increases as Loss increases
+        self.assertTrue((loss_ef['Loss'].is_monotonic_decreasing &
+                         loss_ef['ExFreq'].is_monotonic_increasing),
+                        msg="Expecting loss to decrease as ExpFreq increases")
+
+        # Check index starts at zero and is unique
+        self.assertIsInstance(loss_ef.index, pd.RangeIndex,
+                              msg="Expecting a range index for EF curve")
+
 
 # TODO: Test we can handle an EEF curve with negative loss
 

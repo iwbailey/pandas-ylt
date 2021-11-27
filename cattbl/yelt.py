@@ -99,6 +99,10 @@ class YearEventLossTable:
                 .rename('ExFreq')
                 )
 
+    def to_ef_curve(self):
+        """Return an Exceedance frequency curve"""
+        return 1
+
     def apply_layer(self, limit=None, xs=0.0, n_loss=None, is_franchise=False):
         """Calculate the loss to a layer for each event"""
 
@@ -131,6 +135,10 @@ class YearEventLossTable:
         layer_losses = self.apply_layer(**kwargs)
 
         return layer_losses.sum() / self.n_yrs
+
+    def to_severity_curve(self):
+        """Return a severity curve"""
+        return 1
 
 
 def from_cols(year, eventid, dayofyear, loss, n_yrs):

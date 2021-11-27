@@ -146,7 +146,7 @@ class TestYELTmethods(unittest.TestCase):
         self.assertEqual(len(eef), len(self.test_yelt))
 
         # Test the max frequency is the same as the freq of loss
-        self.assertAlmostEqual(eef.max(), self.test_yelt.freq0)
+        self.assertAlmostEqual(eef.max(), self.test_yelt.yelt.freq0)
 
         # Check all indices are matching
         self.assertTrue(self.test_yelt.index.equals(eef.index))
@@ -155,12 +155,46 @@ class TestYELTmethods(unittest.TestCase):
         self.assertTrue((eef > 0).all())
 
         # Check the frequencies are decreasing as losses increase
-        diffprob = (pd.concat([self.this_yelt, eef], axis=1)
+        diffprob = (pd.concat([self.test_yelt, eef], axis=1)
                     .sort_values('Loss')['ExFreq']
                     .diff()
                     .iloc[1:]
                     )
         self.assertTrue((diffprob <= 0.0).all())
+
+    def test_apply_layer(self):
+        """Test a layer is applied correctly"""
+
+        # Create a yelt
+        y = yelt.from_cols(year=[1, 1, 1, 1], eventid=range(4),
+                           dayofyear=range(1, 5), loss=[5, 7, 8, 10], n_yrs=1)
+
+        # Test an upper limit
+        self.assertTrue((y.yelt.apply_layer(limit=5) == 5.0).all())
+
+        # Test a lower threshold
+        tmp = y.yelt.apply_layer(xs=8)
+
+        # Check we only get one non-zero value back
+        self.assertEqual((tmp > 0.0).sum(), 1)
+
+        # Check the loss of 10 is changed to 2
+        self.assertEqual(tmp.xs(3, level='EventID').iloc[0], 2.0)
+
+        # Check the occurrence cuts of other events
+        self.assertEqual((y.yelt.apply_layer(n_loss=1) > 0).sum(), 1)
+
+        # Check all three combined
+        tmp = y.yelt.apply_layer(limit=2, xs=6, n_loss=2)
+
+        # Should get only two losses
+        self.assertEqual((tmp > 0).sum(), 2)
+
+        # First loss should be 1
+        self.assertEqual(tmp.xs(1, level='EventID').iloc[0], 1.0)
+
+        # Second loss should be 2
+        self.assertEqual(tmp.xs(2, level='EventID').iloc[0], 2.0)
 
     def test_layer_aal(self):
         """Test we can calculate the loss in range"""

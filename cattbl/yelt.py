@@ -100,15 +100,18 @@ class YearEventLossTable:
                 )
 
     def apply_layer(self, limit=None, xs=0.0, n_loss=None, is_franchise=False):
+        """Calculate the loss to a layer for each event"""
 
-        assert xs >= 0 , "Lower loss must be >= 0"
+        assert xs >= 0, "Lower loss must be >= 0"
 
         # Apply layer attachment and limit
         layer_losses = (self._obj
                         .subtract(xs).clip(lower=0.0)
                         .clip(upper=limit)
                         )
-        layer_losses = layer_losses.loc[layer_losses > 0.0]
+
+        # Keep only non-zero losses to make the next steps quicker
+        layer_losses = layer_losses.loc[layer_losses > 0]
 
         if is_franchise:
             layer_losses += xs
@@ -128,6 +131,7 @@ class YearEventLossTable:
         layer_losses = self.apply_layer(**kwargs)
 
         return layer_losses.sum() / self.n_yrs
+
 
 def from_cols(year, eventid, dayofyear, loss, n_yrs):
     """Create a pandas Series YELT (Year Event Loss Table) from its columns

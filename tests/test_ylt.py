@@ -138,7 +138,7 @@ class TestYLT(unittest.TestCase):
         self.assertTrue(ylt_series.index.equals(exprobs.index))
 
         # Check the probabilities are all within range
-        self.assertTrue((exprobs > 0) & (exprobs <= 1.0).all())
+        self.assertTrue((exprobs > 0).all() & (exprobs <= 1.0).all())
 
         # Check the exprobs are decreasing as losses increase
         diffprob = (pd.concat([ylt_series, exprobs], axis=1)

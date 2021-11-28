@@ -162,6 +162,31 @@ class TestYELTmethods(unittest.TestCase):
                     )
         self.assertTrue((diffprob <= 0.0).all())
 
+    def test_cprob(self):
+        """Test we can calculate an EEF curve"""
+
+        cprob = self.test_yelt.yelt.cprob()
+
+        # Test the same length
+        self.assertEqual(len(cprob), len(self.test_yelt))
+
+        # Test the max prob is 1
+        self.assertAlmostEqual(cprob.max(), 1.0)
+
+        # Check all indices are matching
+        self.assertTrue(self.test_yelt.index.equals(cprob.index))
+
+        # Check the probabilities are all within range
+        self.assertTrue((cprob > 0).all())
+
+        # Check the frequencies are decreasing as losses increase
+        diffprob = (pd.concat([self.test_yelt, cprob], axis=1)
+                    .sort_values('Loss')['CProb']
+                    .diff()
+                    .iloc[1:]
+                    )
+        self.assertTrue((diffprob >= 0.0).all())
+
     def test_apply_layer(self):
         """Test a layer is applied correctly"""
 
@@ -227,13 +252,18 @@ class TestYELTmethods(unittest.TestCase):
     def test_severity_curve(self):
         """Test we can calculate a severity curve"""
 
+        sevcurve = self.test_yelt.yelt.to_severity_curve()
+
         # Max prob should be 1
+        self.assertAlmostEqual(sevcurve['CProb'].max(), 1.0)
 
         # Min prob should be 1 / num_losses
+        self.assertAlmostEqual(sevcurve['CProb'].min(), 1 / len(self.test_yelt))
 
         # cumul prob should always increase as loss increases
-
-        pass
+        self.assertTrue((sevcurve['Loss'].is_monotonic_increasing &
+                         sevcurve['CProb'].is_monotonic_increasing),
+                        msg="Expecting loss to increase as CProb increases")
 
     def test_ef_curve(self, keep_index=False):
         """Check the EF curve calculation"""
@@ -252,8 +282,6 @@ class TestYELTmethods(unittest.TestCase):
 
 
 # TODO: Test we can handle an EEF curve with negative loss
-
-# TODO: Test severity
 
 
 if __name__ == '__main__':

@@ -135,7 +135,7 @@ class YearLossTable:
 
         # Get a YLT filled in with zero losses
         with_zeros = (self._obj.copy()
-                      .reindex(range(1, self.n_yrs + 1), fill_value=0.0))
+                      .reindex(range(1, int(self.n_yrs) + 1), fill_value=0.0))
 
         # Create the dataframe by combining loss with exprob
         ep_curve = pd.concat([with_zeros, with_zeros.ylt.exprob(**kwargs)],

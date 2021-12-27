@@ -3,18 +3,8 @@ import pandas as pd
 import numpy as np
 
 
-def main():
-    """Main script"""
-
-    seed = 12345
-    n_years = 1e5  # Number of years
-    freq0 = 0.5  # Number of events per year
-    alpha = 1.0
-    min_loss = 1e3
-    ofilename = "_data/example_pareto_poisson_yelt.csv"
-
-    rs = np.random.RandomState(seed=seed)
-
+def poisson_pareto_yelt(rs, freq0, n_years, min_loss, alpha):
+    """Simulate and create a Poisson/Pareto YELT"""
     # Calculate number of events
     n_events = rs.poisson(freq0 * n_years, 1)[0]
     print(f"n = {n_events} events")
@@ -43,9 +33,48 @@ def main():
     yelt = yelt.set_index(['Year', 'EventID', 'DayOfYear'],
                           verify_integrity=True)
 
+    return yelt
+
+
+def main():
+    """Main script"""
+
+    seed = 12345
+    n_years = 1e5  # Number of years
+    min_loss = 1e3
+    ofilename = "_data/example_pareto_poisson_yelt.csv"
+
+    rs = np.random.RandomState(seed=seed)
+
+    yelt = poisson_pareto_yelt(rs,
+                               freq0=0.5,  # Number of events per year
+                               n_years=n_years,
+                               min_loss=min_loss,
+                               alpha=1.0)
+
     # Write to file
     yelt.to_csv(ofilename, index=True)
     print(f"Written to {ofilename}")
+
+    # Create a second YELT with two models and two losses
+    ofilename2 = "_data/example_two_models_grossnet.csv"
+    yelt2 = poisson_pareto_yelt(rs,
+                               freq0=1.0,  # Number of events per year
+                               n_years=n_years,
+                               min_loss=min_loss,
+                               alpha=1.5)
+
+    # Stack the YELTs together
+    yelt_combined = pd.concat([yelt, yelt2], axis=0, keys=['Model1', 'Model2'],
+                              names=['ModelID'])
+
+    # Add a net loss after 1 mn limit
+    yelt_combined = yelt_combined['Loss'].rename('GrossLoss').to_frame()
+    yelt_combined['NetLoss'] = yelt_combined['GrossLoss'].clip(upper=1e6)
+
+    # Write to file
+    yelt_combined.to_csv(ofilename2, index=True)
+    print(f"Written to {ofilename2}")
 
 
 if __name__ == "__main__":

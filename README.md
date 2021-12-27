@@ -25,3 +25,12 @@ help(cattbl)
 Then help on each module.
 
 ...documentation will be incomplete but more up-to-date than here.
+
+
+## Versions
+
+### v0.0.0 
+First version with modules as ylt and yelt
+### v0.1.0
+Changed names of modules to yearevent and yeareventloss because often yelt, ylt 
+are used as vairable names.

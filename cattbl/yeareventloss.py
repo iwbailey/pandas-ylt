@@ -3,12 +3,32 @@ import warnings
 import pandas as pd
 import numpy as np
 
+from cattbl.yearloss import VALID_YEAR_COLNAMES_LC
 
 COL_YEAR = 'Year'
 COL_EVENT = 'EventID'
 COL_DAY = 'DayOfYear'
 COL_LOSS = 'Loss'
 INDEX_NAMES = [COL_YEAR, COL_DAY, COL_EVENT]
+
+
+def identify_year_col(index_names, valid_yearcol_names=VALID_YEAR_COLNAMES_LC):
+    """Identify which index corresponds to the year"""
+
+    # Check we can find the year index
+    yrcol_match = [i for i, n in enumerate(index_names)
+                   if n is not None and n.lower() in valid_yearcol_names]
+
+    if len(yrcol_match) == 0:
+        warnings.warn("No valid year column name amongst index names." +
+                      f"\nIndex names: {index_names}" +
+                      f"\nValid names (case insensitive): {valid_yearcol_names}")
+        icol = 0
+
+    else:
+        icol = yrcol_match[0]
+
+    return icol
 
 
 @pd.api.extensions.register_series_accessor("yelt")
@@ -21,40 +41,53 @@ class YearEventLossTable:
     """
     def __init__(self, pandas_obj):
         """Validate the series for use with accessor"""
+
         self._validate(pandas_obj)
         self._obj = pandas_obj
+
+        # TODO: Should be able to handle just year, day in some cases
+        # TODO: Should be able to handle just year, eventid in some cases
+        # TODO: Should be able to use year, day, number for other cases
+
+        # Define the column names
+        self.colYear = self._obj.index.names[
+            identify_year_col(self._obj.index.names)]
+        self.colDay = COL_DAY
+        self.colEvent = COL_EVENT
+
+        self.colLoss = self._obj.name
+        if self.colLoss is None:
+            self.colLoss = 'Loss'
 
     @staticmethod
     def _validate(obj):
         """Check it is a valid YELT series"""
 
-        # Check the index names
-        if len(obj.index.names) != 3:
-            raise AttributeError("Expecting 3 index levels")
+        # Check the series is numeric
+        if not pd.api.types.is_numeric_dtype(obj):
+            raise TypeError(f"Series should be numeric. It is {obj.dtype}")
 
-        if not all([c in obj.index.names for c in INDEX_NAMES]):
-            raise AttributeError(f"Expecting index names {INDEX_NAMES}")
+        # Check the index
+        if len(obj.index.names) < 2:
+            raise AttributeError("Expecting at least 2 index levels")
 
-        # Check indices are all integer types
+        # Check indices are all integer types so they can be unique and sortable
         if not all([pd.api.types.is_integer_dtype(c)
                     for c in obj.index.levels]):
             raise TypeError("Indices must all be integer types. Currently: " +
                             f"{[c.dtype for c in obj.index.levels]}")
 
-        # Check the series is numeric
-        if not pd.api.types.is_numeric_dtype(obj):
-            raise TypeError(f"Series should be numeric. It is {obj.dtype}")
+        # Check unique
+        if not obj.index.is_unique:
+            raise AttributeError(f"Index not unique")
 
         # Check n_yrs stored in attributes
         if 'n_yrs' not in obj.attrs.keys():
             raise AttributeError("Must have 'n_yrs' in the series attrs")
 
-        # Check unique
-        if not obj.index.is_unique:
-            raise AttributeError(f"Combinations of {INDEX_NAMES} not unique")
-
         # Check the years are within range 1, n_yrs
-        years = obj.index.get_level_values(COL_YEAR)
+        icol = identify_year_col(obj.index.names)
+        years = obj.index.get_level_values(icol)
         if years.min() < 1 or years.max() > obj.attrs['n_yrs']:
             raise AttributeError("Years in index are out of range 1,n_yrs")
 
@@ -85,7 +118,7 @@ class YearEventLossTable:
         summed loss in a year.
         """
 
-        yrgroup = self._obj.groupby('Year')
+        yrgroup = self._obj.groupby(self.colYear)
 
         if is_occurrence:
             return yrgroup.max()
@@ -103,14 +136,17 @@ class YearEventLossTable:
         """Return an Exceedance frequency curve"""
 
         # Create the dataframe by combining loss with exfreq
-        ef_curve = pd.concat([self._obj.copy(), self._obj.yelt.exfreq(**kwargs)],
+        # TODO: is the copy necessary here?
+        ef_curve = pd.concat([self._obj.copy()
+                             .rename(self.colLoss),
+                              self._obj.yelt.exfreq(**kwargs)],
                              axis=1)
 
         # Sort from largest to smallest loss
         ef_curve = (ef_curve
                     .reset_index()
                     .sort_values(
-                        by=['Loss', 'ExFreq', 'Year', 'DayOfYear'],
+                        by=[self.colLoss, 'ExFreq', self.colYear, self.colDay],
                         ascending=(False, True, False, False)))
 
         if not keep_index:
@@ -140,7 +176,7 @@ class YearEventLossTable:
         ef_curve = self.to_ef_curve(**kwargs)
 
         # Get the max loss for the high return periods
-        max_loss = ef_curve['Loss'].iloc[0]
+        max_loss = ef_curve[self.colLoss].iloc[0]
 
         # Remove invalid return periods
         return_periods = np.array(return_periods).astype(float)
@@ -148,7 +184,7 @@ class YearEventLossTable:
 
         losses = np.interp(1 / return_periods,
                            ef_curve['ExFreq'],
-                           ef_curve['Loss'],
+                           ef_curve[self.colLoss],
                            left=max_loss, right=0.0)
 
         return losses
@@ -176,7 +212,7 @@ class YearEventLossTable:
         sev_curve = (sev_curve
                      .reset_index()
                      .sort_values(
-                         by=['Loss', 'CProb', 'Year', 'DayOfYear'],
+                         by=[self.colLoss, 'CProb', self.colYear, self.colDay],
                          ascending=(True, True, True, True)))
 
         if not keep_index:
@@ -208,8 +244,9 @@ class YearEventLossTable:
         # Apply occurrence limit
         if n_loss is not None:
             layer_losses = (layer_losses
-                            .sort_index(level=[COL_YEAR, COL_DAY, COL_EVENT])
-                            .groupby(COL_YEAR).head(n_loss)
+                            .sort_index(level=[self.colYear, self.colDay,
+                                               self.colEvent])
+                            .groupby(self.colYear).head(n_loss)
                             )
 
         return layer_losses

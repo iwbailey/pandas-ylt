@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='cattbl',
-    version='0.0.0',
+    version='0.1.0',
     packages=['cattbl'],
     url='',
     license='',

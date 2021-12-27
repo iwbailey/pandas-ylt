@@ -1,6 +1,6 @@
 """Test the ylt module is working as expected"""
 import unittest
-from cattbl import ylt
+from cattbl import yearloss as ylt
 import pandas as pd
 import numpy as np
 

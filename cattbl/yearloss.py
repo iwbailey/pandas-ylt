@@ -2,6 +2,13 @@
 """
 import pandas as pd
 import numpy as np
+import warnings
+
+# List of valid index names for the year column
+VALID_YEAR_COLNAMES_LC = ('year', 'period', 'index', 'idx', 'yearidx',
+                     'periodidx', 'year_idx', 'period_idx',
+                     'yearnumber', 'periodnumber', 'yearno', 'periodno',
+                     'yearnum', 'periodnum')
 
 
 @pd.api.extensions.register_series_accessor("ylt")
@@ -17,15 +24,22 @@ class YearLossTable:
         self._validate(pandas_obj)
         self._obj = pandas_obj
 
+        # Define the column names
+        self.colYear = self._obj.index.name
+        if self.colYear.lower() not in VALID_YEAR_COLNAMES_LC:
+            warnings.warn(f"Index col {self.colYear} is not from expected list " +
+                          f"{VALID_YEAR_COLNAMES_LC}")
+
+        self.colLoss = self._obj.name
+        if self.colLoss is None:
+            self.colLoss = 'Loss'
+
     @staticmethod
     def _validate(obj):
         """Verify the name is Loss, index is Year, and attribute n_yrs"""
 
-        if obj.index.name != 'Year':
-            raise AttributeError("Must have 'Year' as index")
-
         if not pd.api.types.is_integer_dtype(obj.index):
-            raise TypeError(f"Year must be integer. It is {obj.index.dtype}")
+            raise TypeError(f"Index must be integer. It is {obj.index.dtype}")
 
         if not pd.api.types.is_numeric_dtype(obj):
             raise TypeError(f"Series should be numeric. It is {obj.dtype}")
@@ -34,7 +48,7 @@ class YearLossTable:
             raise AttributeError("Must have 'n_yrs' in the series attrs")
 
         if not obj.index.is_unique:
-            raise AttributeError("Index years are not unique")
+            raise AttributeError("Index is not unique")
 
         # Check the years are within range 1, n_yrs
         if obj.index.min() < 1 or obj.index.max() > obj.attrs['n_yrs']:
@@ -90,23 +104,18 @@ class YearLossTable:
 
         # Get a YLT filled in with zero losses
         with_zeros = (self._obj.copy()
+                      .rename(self.colLoss)
                       .reindex(range(1, self.n_yrs + 1), fill_value=0.0))
 
         # Get loss vs cumulative prop
         ecdf = pd.concat([with_zeros, with_zeros.ylt.cprob(**kwargs)], axis=1)
 
-        # # If we know there is zero prob of zero loss, add it
-        # if len(self._obj) == self.n_yrs and self._obj.min() > 0.0:
-        #     ecdf = ecdf.append(
-        #         pd.DataFrame({'Loss': 0.0, 'CProb': 0.0},
-        #                      index=pd.Index([-1], name='Year'))
-        #     )
-
         # Sort with loss ascending
-        ecdf = ecdf.reset_index().sort_values(['Loss', 'CProb', 'Year'])
+        ecdf = ecdf.reset_index().sort_values([self.colLoss, 'CProb',
+                                               self.colYear])
 
         if not keep_years:
-            ecdf = ecdf.drop('Year', axis=1).drop_duplicates()
+            ecdf = ecdf.drop(self.colYear, axis=1).drop_duplicates()
 
         # Reset index
         ecdf = ecdf.reset_index(drop=True)
@@ -135,6 +144,7 @@ class YearLossTable:
 
         # Get a YLT filled in with zero losses
         with_zeros = (self._obj.copy()
+                      .rename(self.colLoss)
                       .reindex(range(1, int(self.n_yrs) + 1), fill_value=0.0))
 
         # Create the dataframe by combining loss with exprob
@@ -143,10 +153,10 @@ class YearLossTable:
 
         # Sort from largest to smallest loss
         ep_curve = ep_curve.reset_index().sort_values(
-            by=['Loss', 'ExProb', 'Year'], ascending=(False, True, False))
+            by=[self.colLoss, 'ExProb', self.colYear], ascending=(False, True, False))
 
         if not keep_years:
-            ep_curve = ep_curve.drop('Year', axis=1).drop_duplicates()
+            ep_curve = ep_curve.drop(self.colYear, axis=1).drop_duplicates()
 
         # Reset the index
         ep_curve = ep_curve.reset_index(drop=True)
@@ -172,7 +182,7 @@ class YearLossTable:
         ep_curve = self.to_ep_curve(**kwargs)
 
         # Get the max loss for the high return periods
-        max_loss = ep_curve['Loss'].iloc[0]
+        max_loss = ep_curve[self.colLoss].iloc[0]
 
         # Remove invalid return periods
         return_periods = np.array(return_periods).astype(float)
@@ -180,7 +190,7 @@ class YearLossTable:
 
         losses = np.interp(1 / return_periods,
                            ep_curve['ExProb'],
-                           ep_curve['Loss'],
+                           ep_curve[self.colLoss],
                            left=max_loss, right=0.0)
 
         return losses

@@ -33,11 +33,11 @@ def identify_year_col(index_names, valid_yearcol_names=VALID_YEAR_COLNAMES_LC):
 
 @pd.api.extensions.register_series_accessor("yelt")
 class YearEventLossTable:
-    """Accessor for a Year event loss table as a series.
+    """Accessor for a Year Event Loss Table as a series.
 
-    The pandas series should have a MultiIndex with unique combinations of
-    Year, EventID, DayOfYear (all of int type) and its values contain the
-    losses. There should be an attribute called 'n_yrs'
+    The pandas series should have a MultiIndex with one index defining the year
+    and remaining indices defining an event. The value of the series should
+    represent the loss. There should be an attribute called 'n_yrs'
     """
     def __init__(self, pandas_obj):
         """Validate the series for use with accessor"""
@@ -45,19 +45,9 @@ class YearEventLossTable:
         self._validate(pandas_obj)
         self._obj = pandas_obj
 
-        # TODO: Should be able to handle just year, day in some cases
-        # TODO: Should be able to handle just year, eventid in some cases
-        # TODO: Should be able to use year, day, number for other cases
-
         # Define the column names
-        self.colYear = self._obj.index.names[
+        self.col_year = self._obj.index.names[
             identify_year_col(self._obj.index.names)]
-        self.colDay = COL_DAY
-        self.colEvent = COL_EVENT
-
-        self.colLoss = self._obj.name
-        if self.colLoss is None:
-            self.colLoss = 'Loss'
 
     @staticmethod
     def _validate(obj):
@@ -69,12 +59,12 @@ class YearEventLossTable:
 
         # Check the index
         if len(obj.index.names) < 2:
-            raise AttributeError("Expecting at least 2 index levels")
+            raise AttributeError("Need at least 2 index levels to define year" +
+                                 "/events")
 
-        # Check indices are all integer types so they can be unique and sortable
-        if not all([pd.api.types.is_integer_dtype(c)
-                    for c in obj.index.levels]):
-            raise TypeError("Indices must all be integer types. Currently: " +
+        # Check indices can be unique and sortable
+        if any([pd.api.types.is_float_dtype(c) for c in obj.index.levels]):
+            warnings.warn("Float indices found which might cause errors: " +
                             f"{[c.dtype for c in obj.index.levels]}")
 
         # Check unique
@@ -102,6 +92,19 @@ class YearEventLossTable:
         return self._obj.attrs['n_yrs']
 
     @property
+    def col_loss(self):
+        """Return the name of the loss column based on series name or default"""
+        if self._obj.name is None:
+            return 'Loss'
+        else:
+            return self._obj.name
+
+    @property
+    def event_index_names(self):
+        """Return the list of all index names in order without the year"""
+        return [n for n in self._obj.index.names if n != self.col_year]
+
+    @property
     def aal(self):
         """Return the average annual loss"""
         return self._obj.sum() / self.n_yrs
@@ -118,7 +121,7 @@ class YearEventLossTable:
         summed loss in a year.
         """
 
-        yrgroup = self._obj.groupby(self.colYear)
+        yrgroup = self._obj.groupby(self.col_year)
 
         if is_occurrence:
             return yrgroup.max()
@@ -126,37 +129,94 @@ class YearEventLossTable:
             return yrgroup.sum()
 
     def exfreq(self, **kwargs):
-        """For each loss calculate the frequency >= loss"""
+        """For each loss calculate the frequency >= loss
+
+        :returns: [pandas.Series] named 'ExFreq' with the frequency of >= loss
+        in the source series. The index is not changed
+
+        **kwargs are passed to pandas.Series.rank . However, arguments are
+        reserved: ascending=False, method='min'.
+        """
         return (self._obj.rank(ascending=False, method='min', **kwargs)
                 .divide(self.n_yrs)
                 .rename('ExFreq')
                 )
 
-    def to_ef_curve(self, keep_index=False, **kwargs):
-        """Return an Exceedance frequency curve"""
+    def cprob(self, **kwargs):
+        """Calculate the empiric conditional cumulative probability of loss size
+
+        CProb = Prob(X<=x|Loss has occurred) where X is the event loss, given a
+        loss has occurred.
+        """
+        return (self._obj.rank(ascending=True, method='max', **kwargs)
+                .divide(len(self._obj))
+                .rename('CProb')
+                )
+
+    def to_ef_curve(self, keep_index=False, col_exfreq='ExFreq',
+                    new_index_name='Order', **kwargs):
+        """Return an Exceedance frequency curve
+
+        :returns: [pandas.DataFrame] the frequency (/year) of >= each loss
+        in the YELT. Column name for loss is retained.
+
+        If keep_index=False, duplicate loss
+        """
 
         # Create the dataframe by combining loss with exfreq
         # TODO: is the copy necessary here?
         ef_curve = pd.concat([self._obj.copy()
-                             .rename(self.colLoss),
-                              self._obj.yelt.exfreq(**kwargs)],
+                             .rename(self.col_loss),
+                              self._obj.yelt.exfreq(**kwargs)
+                             .rename(col_exfreq)],
                              axis=1)
 
         # Sort from largest to smallest loss
         ef_curve = (ef_curve
                     .reset_index()
-                    .sort_values(
-                        by=[self.colLoss, 'ExFreq', self.colYear, self.colDay],
-                        ascending=(False, True, False, False)))
+                    .sort_values(by=[self.col_loss, col_exfreq, self.col_year] +
+                                     self.event_index_names,
+                                 ascending=[False, True, False] +
+                                 [False] * len(self.event_index_names))
+        )
 
         if not keep_index:
-            ef_curve = ef_curve.drop(INDEX_NAMES, axis=1).drop_duplicates()
+            ef_curve = ef_curve[[self.col_loss, col_exfreq]].drop_duplicates()
 
         # Reset the index
         ef_curve = ef_curve.reset_index(drop=True)
-        ef_curve.index.name = 'Order'
+        ef_curve.index.name = new_index_name
 
         return ef_curve
+
+    def to_severity_curve(self, keep_index=False, col_cprob='CProb',
+                          new_index_name='Order', **kwargs):
+        """Return a severity curve. Cumulative prob of loss size."""
+
+        # Create the dataframe by combining loss with cumulative probability
+        # TODO: is the copy necessary here?
+        sev_curve = pd.concat([self._obj.copy()
+                              .rename(self.col_loss),
+                               self._obj.yelt.cprob(**kwargs)
+                              .rename(col_cprob)],
+                              axis=1)
+
+        # Sort from largest to smallest loss
+        sev_curve = (sev_curve
+                     .reset_index()
+                     .sort_values(by=[self.col_loss, col_cprob, self.col_year] +
+                                      self.event_index_names,
+                                  ascending=[True, True, True] +
+                                            [True] * len(self.event_index_names)))
+
+        if not keep_index:
+            sev_curve = sev_curve[[self.col_loss, col_cprob]].drop_duplicates()
+
+        # Reset the index
+        sev_curve = sev_curve.reset_index(drop=True)
+        sev_curve.index.name = new_index_name
+
+        return sev_curve
 
     def loss_at_rp(self, return_periods, **kwargs):
         """Interpolate the year loss table for losses at specific return periods
@@ -176,7 +236,7 @@ class YearEventLossTable:
         ef_curve = self.to_ef_curve(**kwargs)
 
         # Get the max loss for the high return periods
-        max_loss = ef_curve[self.colLoss].iloc[0]
+        max_loss = ef_curve[self.col_loss].iloc[0]
 
         # Remove invalid return periods
         return_periods = np.array(return_periods).astype(float)
@@ -184,45 +244,10 @@ class YearEventLossTable:
 
         losses = np.interp(1 / return_periods,
                            ef_curve['ExFreq'],
-                           ef_curve[self.colLoss],
+                           ef_curve[self.col_loss],
                            left=max_loss, right=0.0)
 
         return losses
-
-    def cprob(self, **kwargs):
-        """Calculate the empiric conditional cumulative probability of loss size
-
-        CProb = Prob(X<=x|Loss has occurred) where X is the event loss, given a
-        loss has occurred.
-        """
-        return (self._obj.rank(ascending=True, method='max', **kwargs)
-                .divide(len(self._obj))
-                .rename('CProb')
-                )
-
-    def to_severity_curve(self, keep_index=False, **kwargs):
-        """Return a severity curve. Cumulative prob of loss size."""
-
-        # Create the dataframe by combining loss with cumulative probability
-        sev_curve = pd.concat([self._obj.copy(),
-                               self._obj.yelt.cprob(**kwargs)],
-                              axis=1)
-
-        # Sort from largest to smallest loss
-        sev_curve = (sev_curve
-                     .reset_index()
-                     .sort_values(
-                         by=[self.colLoss, 'CProb', self.colYear, self.colDay],
-                         ascending=(True, True, True, True)))
-
-        if not keep_index:
-            sev_curve = sev_curve.drop(INDEX_NAMES, axis=1).drop_duplicates()
-
-        # Reset the index
-        sev_curve = sev_curve.reset_index(drop=True)
-        sev_curve.index.name = 'Order'
-
-        return sev_curve
 
     def apply_layer(self, limit=None, xs=0.0, n_loss=None, is_franchise=False):
         """Calculate the loss to a layer for each event"""
@@ -244,9 +269,9 @@ class YearEventLossTable:
         # Apply occurrence limit
         if n_loss is not None:
             layer_losses = (layer_losses
-                            .sort_index(level=[self.colYear, self.colDay,
-                                               self.colEvent])
-                            .groupby(self.colYear).head(n_loss)
+                            .sort_index(level=[self.col_year] +
+                                               self.event_index_names)
+                            .groupby(self.col_year).head(n_loss)
                             )
 
         return layer_losses
@@ -317,7 +342,7 @@ def from_cols(year, eventid, dayofyear, loss, n_yrs):
                              COL_DAY: dayofyear,
                              COL_LOSS: loss})
     try:
-        new_yelt.set_index([COL_YEAR, COL_EVENT, COL_DAY],
+        new_yelt.set_index(INDEX_NAMES,
                            verify_integrity=True, inplace=True)
     except ValueError:
         raise ValueError("You cannot have duplicate combinations of " +

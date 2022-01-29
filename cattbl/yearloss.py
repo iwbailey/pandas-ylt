@@ -108,7 +108,7 @@ class YearLossTable:
                       .reindex(range(1, self.n_yrs + 1), fill_value=0.0))
 
         # Get loss vs cumulative prop
-        ecdf = pd.concat([with_zeros, with_zeros.ylt.cprob(**kwargs)], axis=1)
+        ecdf = pd.concat([with_zeros, with_zeros.yl.cprob(**kwargs)], axis=1)
 
         # Sort with loss ascending
         ecdf = ecdf.reset_index().sort_values([self.colLoss, 'CProb',
@@ -148,7 +148,7 @@ class YearLossTable:
                       .reindex(range(1, int(self.n_yrs) + 1), fill_value=0.0))
 
         # Create the dataframe by combining loss with exprob
-        ep_curve = pd.concat([with_zeros, with_zeros.ylt.exprob(**kwargs)],
+        ep_curve = pd.concat([with_zeros, with_zeros.yl.exprob(**kwargs)],
                              axis=1)
 
         # Sort from largest to smallest loss
@@ -230,7 +230,7 @@ def from_cols(year, loss, n_yrs):
     # Store the number of years as meta-data
     ylt.attrs['n_yrs'] = n_yrs
 
-    _ = ylt.ylt.is_valid
+    _ = ylt.yl.is_valid
 
     return ylt
 
@@ -247,6 +247,6 @@ def from_yelt(yelt):
     ylt.attrs['n_yrs'] = yelt.attrs['n_yrs']
 
     # Validate
-    _ = ylt.ylt.is_valid
+    _ = ylt.yl.is_valid
 
     return ylt

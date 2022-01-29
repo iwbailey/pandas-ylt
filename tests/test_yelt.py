@@ -118,11 +118,11 @@ class TestYELTmethods(unittest.TestCase):
         this_ylt = self.test_yelt.yel.to_ylt()
 
         # Check it is a valid YLT
-        self.assertTrue(this_ylt.ylt.is_valid)
+        self.assertTrue(this_ylt.yl.is_valid)
 
         # Check the AAL are equal
         self.assertAlmostEqual(self.test_yelt.yel.aal,
-                               this_ylt.ylt.aal)
+                               this_ylt.yl.aal)
 
     def test_to_occ_ylt(self):
         """Test we can convert to a year occurrence loss table"""
@@ -130,7 +130,7 @@ class TestYELTmethods(unittest.TestCase):
         this_ylt = self.test_yelt.yel.to_ylt(is_occurrence=True)
 
         # Check it is a valid YLT
-        self.assertTrue(this_ylt.ylt.is_valid)
+        self.assertTrue(this_ylt.yl.is_valid)
 
         # Check all values are less or equal than the annual
         agg_ylt = self.test_yelt.yel.to_ylt()

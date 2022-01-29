@@ -167,7 +167,7 @@ class YearEventLossTable:
         # TODO: is the copy necessary here?
         ef_curve = pd.concat([self._obj.copy()
                              .rename(self.col_loss),
-                              self._obj.yelt.exfreq(**kwargs)
+                              self._obj.yel.exfreq(**kwargs)
                              .rename(col_exfreq)],
                              axis=1)
 
@@ -197,7 +197,7 @@ class YearEventLossTable:
         # TODO: is the copy necessary here?
         sev_curve = pd.concat([self._obj.copy()
                               .rename(self.col_loss),
-                               self._obj.yelt.cprob(**kwargs)
+                               self._obj.yel.cprob(**kwargs)
                               .rename(col_cprob)],
                               axis=1)
 

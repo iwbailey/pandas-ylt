@@ -28,9 +28,10 @@ Then help on each module.
 
 
 ## Versions
-
-### v0.0.0 
-First version with modules as ylt and yelt
+### v0.1.1
+Removed the "t" from accessor names, i.e. changed names of accessors to yel and yl
 ### v0.1.0
 Changed names of modules to yearevent and yeareventloss because often yelt, ylt 
 are used as vairable names.
+### v0.0.0 
+First version with modules as ylt and yelt

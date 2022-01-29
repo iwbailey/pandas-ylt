@@ -31,7 +31,7 @@ def identify_year_col(index_names, valid_yearcol_names=VALID_YEAR_COLNAMES_LC):
     return icol
 
 
-@pd.api.extensions.register_series_accessor("yelt")
+@pd.api.extensions.register_series_accessor("yel")
 class YearEventLossTable:
     """Accessor for a Year Event Loss Table as a series.
 

@@ -11,7 +11,7 @@ VALID_YEAR_COLNAMES_LC = ('year', 'period', 'index', 'idx', 'yearidx',
                      'yearnum', 'periodnum')
 
 
-@pd.api.extensions.register_series_accessor("ylt")
+@pd.api.extensions.register_series_accessor("yl")
 class YearLossTable:
     """A year loss table as a pandas series accessor
 

@@ -34,14 +34,14 @@ class TestYLT(unittest.TestCase):
                       msg="Expected num years in attrs")
 
         # Check we pass the validation checks
-        self.assertTrue(ylt_series.ylt.is_valid)
+        self.assertTrue(ylt_series.yl.is_valid)
 
     def test_calc_aal(self):
         """Test calculation of AAL"""
         ylt_series = self.get_default_ylt()
 
         # check we get the expected value for the AAL
-        self.assertAlmostEqual(ylt_series.ylt.aal,
+        self.assertAlmostEqual(ylt_series.yl.aal,
                                self.ylt_in['Loss'].sum() / self.n_years,
                                delta=1e-12)
 
@@ -50,7 +50,7 @@ class TestYLT(unittest.TestCase):
 
         # Test we get expected prob for default example
         ylt_series = self.get_default_ylt()
-        self.assertAlmostEqual(ylt_series.ylt.prob_of_a_loss,
+        self.assertAlmostEqual(ylt_series.yl.prob_of_a_loss,
                                1 - (self.ylt_in.Loss > 0).sum() / self.n_years)
 
     def test_prob_of_loss_with_negative(self):
@@ -60,12 +60,12 @@ class TestYLT(unittest.TestCase):
         # Test a more complex example with negatives and zeros
         ylt2 = ylt.from_cols(year=[1, 2, 3, 4, 5], loss=[-1, 0, 0, 2, 3],
                              n_yrs=6)
-        self.assertAlmostEqual(ylt2.ylt.prob_of_a_loss, 2 / 6)
+        self.assertAlmostEqual(ylt2.yl.prob_of_a_loss, 2 / 6)
 
     def test_cprob(self):
         """Test calculation of cumulative distribution"""
         ylt_series = self.get_default_ylt()
-        cprobs = ylt_series.ylt.cprob()
+        cprobs = ylt_series.yl.cprob()
 
         # Check no change in series length
         self.assertEqual(len(ylt_series), len(cprobs),
@@ -93,12 +93,12 @@ class TestYLT(unittest.TestCase):
         ylt_series = self.get_default_ylt()
 
         # Check the columns are there
-        ecdf = ylt_series.ylt.to_ecdf()
+        ecdf = ylt_series.yl.to_ecdf()
         self.assertTrue('Loss' in ecdf.columns, msg="Expected 'Loss' column")
         self.assertTrue('CProb' in ecdf.columns, msg="Expected 'CProb' column")
 
         # Check the cprobs are aligned with the series
-        cprobs = ylt_series.ylt.cprob()
+        cprobs = ylt_series.yl.cprob()
         self.assertTrue(all([c in ecdf['CProb'].values for c in cprobs]),
                         'Expected all calculated cprobs to be in ecdf')
 
@@ -110,7 +110,7 @@ class TestYLT(unittest.TestCase):
         # Check a case with negative losses
         ylt2 = ylt.from_cols(year=[1, 2, 3, 4, 5], loss=[-1, 0, 0, 2, 3],
                              n_yrs=6)
-        ecdf = ylt2.ylt.to_ecdf()
+        ecdf = ylt2.yl.to_ecdf()
 
         # Check monotonically increasing
         self.assertTrue(ecdf['Loss'].is_monotonic_increasing &
@@ -119,17 +119,17 @@ class TestYLT(unittest.TestCase):
     def test_ecdf_keep_years(self):
         """Test the ECDF returns the years when requested"""
         ylt_series = self.get_default_ylt()
-        ecdf = ylt_series.ylt.to_ecdf(keep_years=False)
+        ecdf = ylt_series.yl.to_ecdf(keep_years=False)
         self.assertFalse('Year' in ecdf.columns)
 
-        ecdf = ylt_series.ylt.to_ecdf(keep_years=True)
+        ecdf = ylt_series.yl.to_ecdf(keep_years=True)
         self.assertTrue('Year' in ecdf.columns)
 
     def test_exprob(self):
         """Test calculation of exceedance prob"""
         ylt_series = self.get_default_ylt()
 
-        exprobs = ylt_series.ylt.exprob()
+        exprobs = ylt_series.yl.exprob()
 
         # Check they are the same length
         self.assertEqual(len(ylt_series), len(exprobs))
@@ -153,7 +153,7 @@ class TestYLT(unittest.TestCase):
         ylt_series = self.get_default_ylt()
 
         # Get the EP curve
-        loss_ep = ylt_series.ylt.to_ep_curve(keep_years)
+        loss_ep = ylt_series.yl.to_ep_curve(keep_years)
 
         # Check Exprob increases as Loss increases
         self.assertTrue((loss_ep['Loss'].is_monotonic_decreasing &
@@ -169,8 +169,8 @@ class TestYLT(unittest.TestCase):
         self.test_ep_curve(False)
         ylt_series = self.get_default_ylt()
 
-        loss_ep = ylt_series.ylt.to_ep_curve(keep_years=False)
-        loss_ep_v2 = ylt_series.ylt.to_ep_curve(keep_years=True)
+        loss_ep = ylt_series.yl.to_ep_curve(keep_years=False)
+        loss_ep_v2 = ylt_series.yl.to_ep_curve(keep_years=True)
 
         self.assertTrue(loss_ep.reset_index(drop=True).equals(
                 (loss_ep_v2[loss_ep.columns]
@@ -188,12 +188,12 @@ class TestYLT(unittest.TestCase):
         ylt_series = self.get_default_ylt()
 
         # Check the max loss is at the max return period
-        self.assertEqual(ylt_series.ylt.loss_at_rp(self.n_years),
+        self.assertEqual(ylt_series.yl.loss_at_rp(self.n_years),
                          ylt_series.max())
 
         # Check we can do multiple return periods including outside of range
         retpers = range(12)
-        losses = ylt_series.ylt.loss_at_rp(retpers)
+        losses = ylt_series.yl.loss_at_rp(retpers)
 
         # Check same number of values returned
         self.assertEqual(len(losses), len(retpers))

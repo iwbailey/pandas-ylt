@@ -70,6 +70,11 @@ class YearLossTable:
         return self._obj.sum() / self.n_yrs
 
     @property
+    def std(self):
+        """Return the standard deviation of annual loss"""
+        return self.to_ylt_filled().std()
+
+    @property
     def is_all_positive(self):
         """Returns true if all loss values are positive"""
         return (self._obj > 0.0).all()
@@ -90,6 +95,14 @@ class YearLossTable:
                 .rename('CProb')
                 )
 
+    def to_ylt_filled(self, fill_value=0.0):
+        """Get a YLT with all years in the index, missing years filled value"""
+
+        filled_ylt = self._obj.reindex(range(1, int(self.n_yrs) + 1),
+                                       fill_value=fill_value)
+
+        return filled_ylt
+
     def to_ecdf(self, keep_years=False, **kwargs):
         """Return the empirical cumulative loss distribution function
 
@@ -103,9 +116,8 @@ class YearLossTable:
         """
 
         # Get a YLT filled in with zero losses
-        with_zeros = (self._obj.copy()
-                      .rename(self.colLoss)
-                      .reindex(range(1, self.n_yrs + 1), fill_value=0.0))
+        with_zeros = (self.to_ylt_filled(fill_value=0.0)
+                      .rename(self.colLoss))
 
         # Get loss vs cumulative prop
         ecdf = pd.concat([with_zeros, with_zeros.yl.cprob(**kwargs)], axis=1)

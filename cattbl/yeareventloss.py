@@ -312,23 +312,37 @@ class YearEventLossTable:
                          index=pd.Index(return_periods, name='ReturnPeriod'),
                          name='Loss')
 
-    def to_ep_summaries(self, return_periods, is_eef=True, **kwargs):
+    def to_ep_summaries(self, return_periods, is_eef=True,
+                        colname_aep='YearLoss', colname_oep='MaxEventLoss',
+                        colname_eef='EventLoss', **kwargs):
         """Return a dataframe with multiple EP curves side by side"""
 
         aep = self.to_ep_summary(return_periods, is_occurrence=False, **kwargs)
         oep = self.to_ep_summary(return_periods, is_occurrence=True, **kwargs)
 
-        aep = aep.rename('LossPerYear')
-        oep = oep.rename('MaxEventLossPerYear')
+        aep = aep.rename(colname_aep)
+        oep = oep.rename(colname_oep)
 
         if is_eef:
             eef = self.to_ef_summary(return_periods, **kwargs)
-            eef = eef.rename('EventLoss')
+            eef = eef.rename(colname_eef)
             combined = pd.concat([aep, oep, eef], axis=1)
         else:
             combined = pd.concat([aep, oep], axis=1)
 
         return combined
+
+    def to_aal_series(self, is_std=True, aal_name='AAL', std_name='STD'):
+        """Return a pandas series with the AAL """
+
+        result = pd.Series([self.aal], index=[aal_name], name='')
+
+        if is_std:
+            stddev = self.to_ylt().yl.std
+            result = pd.concat([result,
+                                pd.Series([stddev], index=[std_name], name='')])
+
+        return result
 
 
 def from_cols(year, eventid, dayofyear, loss, n_yrs):

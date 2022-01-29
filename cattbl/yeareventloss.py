@@ -295,7 +295,7 @@ class YearEventLossTable:
 
         ylt = self.to_ylt(is_occurrence)
 
-        return pd.Series(ylt.ylt.loss_at_rp(return_periods, **kwargs),
+        return pd.Series(ylt.yl.loss_at_rp(return_periods, **kwargs),
                          index=pd.Index(return_periods, name='ReturnPeriod'),
                          name='Loss')
 

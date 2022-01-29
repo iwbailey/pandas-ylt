@@ -299,6 +299,19 @@ class YearEventLossTable:
                          index=pd.Index(return_periods, name='ReturnPeriod'),
                          name='Loss')
 
+    def to_ef_summary(self, return_periods, **kwargs):
+        """Get loss at summary return periods and return a pandas Series
+
+        For an EF curve, the return period is 1 / rate of event occurrence
+
+        :returns: [pands.Series] with index 'ReturnPeriod' and Losses at each
+        of those return periods
+        """
+
+        return pd.Series(self.loss_at_rp(return_periods, **kwargs),
+                         index=pd.Index(return_periods, name='ReturnPeriod'),
+                         name='Loss')
+
     def to_ep_summaries(self, return_periods, is_eef=True, **kwargs):
         """Return a dataframe with multiple EP curves side by side"""
 
@@ -306,10 +319,10 @@ class YearEventLossTable:
         oep = self.to_ep_summary(return_periods, is_occurrence=True, **kwargs)
 
         aep = aep.rename('LossPerYear')
-        oep = oep.renaem('MaxEventLossPerYear')
+        oep = oep.rename('MaxEventLossPerYear')
 
         if is_eef:
-            eef = self.loss_at_rp(return_periods, **kwargs)
+            eef = self.to_ef_summary(return_periods, **kwargs)
             eef = eef.rename('EventLoss')
             combined = pd.concat([aep, oep, eef], axis=1)
         else:

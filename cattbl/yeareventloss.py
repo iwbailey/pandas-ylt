@@ -431,3 +431,154 @@ def from_csv(ifile, n_yrs):
     df = pd.read_csv(ifile, usecols=INDEX_NAMES + [COL_LOSS])
 
     return from_df(df, n_yrs)
+
+
+@pd.api.extensions.register_dataframe_accessor("yel")
+class YearEventLossTables:
+    """Year event loss tables sharing the same index"""
+    def __init__(self, pandas_obj):
+        """Validate the dataframe for use with accessor"""
+
+        self._validate(pandas_obj)
+        self._obj = pandas_obj
+
+        # Define the column names
+        self.col_year = self._obj.index.names[
+            identify_year_col(self._obj.index.names)]
+
+    @staticmethod
+    def _validate(obj):
+        """Check it is a valid YELT series"""
+
+        # Check the dataframe is numeric
+        for c in obj.columns:
+            if not pd.api.types.is_numeric_dtype(obj[c]):
+                raise TypeError(f"All series should be numeric. {c} is {obj[c].dtype}")
+
+        # Validate the first series
+        assert obj[obj.columns[0]].yel.is_valid
+
+    @property
+    def is_valid(self):
+        """Check we can pass the initialisation checks"""
+        return True
+
+    @property
+    def n_yrs(self):
+        """Return the number of years for the ylt"""
+        return self._obj.attrs['n_yrs']
+
+    @property
+    def event_index_names(self):
+        """Return the list of all index names in order without the year"""
+        return [n for n in self._obj.index.names if n != self.col_year]
+
+    @property
+    def aal(self):
+        """Return the average annual loss"""
+        return self._obj.sum() / self.n_yrs
+
+    @property
+    def freq0(self):
+        """Frequency of a loss greater than zero"""
+        return (self._obj > 0).sum() / self.n_yrs
+
+    def to_ylt(self, is_occurrence=False):
+        """Convert to a YLT
+
+        If is_occurrence return the max loss in a year. Otherwise return the
+        summed loss in a year.
+        """
+
+        yrgroup = self._obj.groupby(self.col_year)
+
+        if is_occurrence:
+            return yrgroup.max()
+        else:
+            return yrgroup.sum()
+
+    def to_ef_curves(self, col_exfreq='ExFreq', **kwargs):
+        """Return exceedance frequency curves for each column
+
+        :returns: [pandas.DataFrame] the frequency (/year) of >= each loss
+        in the YELT. Column name for loss is retained.
+
+        """
+
+        ef_curves = pd.concat([self._obj[c].yel.to_ef_curve(keep_index=False,
+                                                            col_exfreq=col_exfreq,
+                                                            **kwargs)
+                               for c in self._obj.columns],
+                              axis=1)
+
+        ef_curves = ef_curves.fillna(0.0)
+
+        ef_curves = ef_curves.drop(col_exfreq, axis=1)
+        ef_curves[col_exfreq] = 1.0 / ef_curves.index
+
+        return ef_curves
+
+    def to_ep_summary(self, return_periods, **kwargs):
+        """Get loss at summary return periods and return a pandas Series
+
+        :returns: [pands.Series] with index 'ReturnPeriod' and Losses at each
+        of those return periods
+        """
+
+        losses = pd.concat([self._obj[c].yel.to_ep_summary(return_periods,
+                                                           **kwargs)
+                            for c in self._obj.columns],
+                           axis=1)
+
+        losses.columns = self._obj.columns
+
+        return losses
+
+    # def to_ef_summary(self, return_periods, **kwargs):
+    #     """Get loss at summary return periods and return a pandas Series
+    #
+    #     For an EF curve, the return period is 1 / rate of event occurrence
+    #
+    #     :returns: [pands.Series] with index 'ReturnPeriod' and Losses at each
+    #     of those return periods
+    #     """
+    #
+    #     return pd.Series(self.loss_at_rp(return_periods, **kwargs),
+    #                      index=pd.Index(return_periods, name='ReturnPeriod'),
+    #                      name='Loss')
+    #
+    # def to_ep_summaries(self, return_periods, is_eef=True,
+    #                     colname_aep='YearLoss', colname_oep='MaxEventLoss',
+    #                     colname_eef='EventLoss', **kwargs):
+    #     """Return a dataframe with multiple EP curves side by side"""
+    #
+    #     aep = self.to_ep_summary(return_periods, is_occurrence=False, **kwargs)
+    #     oep = self.to_ep_summary(return_periods, is_occurrence=True, **kwargs)
+    #
+    #     aep = aep.rename(colname_aep)
+    #     oep = oep.rename(colname_oep)
+    #
+    #     if is_eef:
+    #         eef = self.to_ef_summary(return_periods, **kwargs)
+    #         eef = eef.rename(colname_eef)
+    #         combined = pd.concat([aep, oep, eef], axis=1)
+    #     else:
+    #         combined = pd.concat([aep, oep], axis=1)
+    #
+    #     return combined
+
+    def to_aal_df(self, is_std=True, hide_columns=False, aal_name='AAL', std_name='STD'):
+        """Return a pandas series with the AAL """
+
+        result = pd.Series(self.aal, name=aal_name).to_frame().T
+
+        if is_std:
+            stddev = [self._obj[c].yel.to_ylt().yl.std for c in self._obj.columns]
+
+            result = result.append(
+                     pd.Series(stddev, name=std_name, index=self._obj.columns))
+
+        if hide_columns:
+            result.columns = [''] * self._obj.shape[1]
+
+        return result

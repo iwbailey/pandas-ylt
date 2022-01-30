@@ -61,8 +61,6 @@ class TestYLT(unittest.TestCase):
         # Check we get the same standard deviation back
         self.assertEqual(test_ref.std(), test_ylt.yl.std)
 
-
-
     def test_prob_of_a_loss_default(self):
         """Test we calculate the right prob of a loss"""
 

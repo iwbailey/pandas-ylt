@@ -1,7 +1,10 @@
 """Generate a YELT for the tests"""
+import os
 import pandas as pd
 import numpy as np
 
+THIS_DIR = os.path.dirname(__file__)
+print(THIS_DIR)
 
 def poisson_pareto_yelt(rs, freq0, n_years, min_loss, alpha):
     """Simulate and create a Poisson/Pareto YELT"""
@@ -68,9 +71,15 @@ def main():
     yelt_combined = pd.concat([yelt, yelt2], axis=0, keys=['Model1', 'Model2'],
                               names=['ModelID'])
 
-    # Add a net loss after 1 mn limit
+    # Add a net loss after a limit
     yelt_combined = yelt_combined['Loss'].rename('GrossLoss').to_frame()
-    yelt_combined['NetLoss'] = yelt_combined['GrossLoss'].clip(upper=1e6)
+    yelt_combined['NetLoss'] = yelt_combined['GrossLoss']
+
+    # Apply deductible
+    yelt_combined['NetLoss'] = (yelt_combined['NetLoss'] - 20e3).clip(lower=0.0)
+
+    # Apply a limit
+    yelt_combined['NetLoss'] = yelt_combined['NetLoss'].clip(upper=120e3)
 
     # Write to file
     yelt_combined.to_csv(ofilename2, index=True)

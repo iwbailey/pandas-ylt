@@ -135,14 +135,14 @@ class YearLossTable:
 
         return ecdf
 
-    def exprob(self, **kwargs):
+    def exprob(self, method='first', **kwargs):
         """Calculate the empiric annual exceedance probability for each loss
 
         The exceedance prob is defined here as P(Loss >= x)
 
         :returns: [pandas.Series] of probabilities with same index
         """
-        return (self._obj.rank(ascending=False, method='min', **kwargs)
+        return (self._obj.rank(ascending=False, method=method, **kwargs)
                 .divide(self.n_yrs)
                 .rename('ExProb')
                 )

@@ -164,6 +164,12 @@ class TestYLT(unittest.TestCase):
                     )
         self.assertTrue((diffprob <= 0.0).all())
 
+    def test_exprob_with_dup_losses(self):
+        """Test we pick out the largest exceedance prob for duplicate losses"""
+
+        pass
+
+
     def test_ep_curve(self, keep_years=False):
         """Check the EP curve calculation"""
         ylt_series = self.get_default_ylt()

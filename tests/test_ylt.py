@@ -45,6 +45,24 @@ class TestYLT(unittest.TestCase):
                                self.ylt_in['Loss'].sum() / self.n_years,
                                delta=1e-12)
 
+    def test_calc_std(self):
+        """Test calculation of standard deviation"""
+
+        # Reference with the zero loss years included
+        test_ref = pd.Series([1, 2, 0, 4, 0, 6, 7, 0, 9, 10])
+
+        # Make an equivalent ylt with zero loss years not included
+        test_ylt = test_ref.copy()
+        test_ylt.index = pd.Index(range(1, 11), name='Year')
+        test_ylt.name = 'Loss'
+        test_ylt.attrs['n_yrs'] = 10
+        test_ylt = test_ylt.loc[test_ylt> 0]
+
+        # Check we get the same standard deviation back
+        self.assertEqual(test_ref.std(), test_ylt.yl.std)
+
+
+
     def test_prob_of_a_loss_default(self):
         """Test we calculate the right prob of a loss"""
 

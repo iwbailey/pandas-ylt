@@ -75,11 +75,6 @@ class YearLossTable:
         return self.to_ylt_filled().std()
 
     @property
-    def is_all_positive(self):
-        """Returns true if all loss values are positive"""
-        return (self._obj > 0.0).all()
-
-    @property
     def prob_of_a_loss(self):
         """Empirical probability of a positive loss year"""
         return (self._obj > 0).sum() / self.n_yrs
@@ -135,13 +130,14 @@ class YearLossTable:
 
         return ecdf
 
-    def exprob(self, method='first', **kwargs):
+    def exprob(self, method='max', **kwargs):
         """Calculate the empiric annual exceedance probability for each loss
 
         The exceedance prob is defined here as P(Loss >= x)
 
         :returns: [pandas.Series] of probabilities with same index
         """
+
         return (self._obj.rank(ascending=False, method=method, **kwargs)
                 .divide(self.n_yrs)
                 .rename('ExProb')
@@ -165,7 +161,8 @@ class YearLossTable:
 
         # Sort from largest to smallest loss
         ep_curve = ep_curve.reset_index().sort_values(
-            by=[self.colLoss, 'ExProb', self.colYear], ascending=(False, True, False))
+            by=[self.colLoss, 'ExProb', self.colYear],
+                ascending=(False, True, False))
 
         if not keep_years:
             ep_curve = ep_curve.drop(self.colYear, axis=1).drop_duplicates()
@@ -191,15 +188,16 @@ class YearLossTable:
         """
 
         # Get the full EP curve
-        ep_curve = self.to_ep_curve(**kwargs)
+        ep_curve = self.to_ep_curve(method='first', **kwargs)
 
         # Get the max loss for the high return periods
         max_loss = ep_curve[self.colLoss].iloc[0]
 
-        # Remove invalid return periods
+        # Replace invalid return periods with NaN
         return_periods = np.array(return_periods).astype(float)
         return_periods[return_periods < 1.0] = np.nan
 
+        # Interpolate between the return periods
         losses = np.interp(1 / return_periods,
                            ep_curve['ExProb'],
                            ep_curve[self.colLoss],

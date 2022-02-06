@@ -226,9 +226,9 @@ class YearEventLossTable:
 
         :returns: [numpy.array] losses at the corresponding return periods
 
-        The interpolation is done on exceedance probability.
-        Values below the smallest exceedance probability get the max loss
-        Values above the largest exceedance probability get zero
+        The interpolation is done on exceedance frequency.
+        Values below the smallest exceedance frequency get the max loss
+        Values above the largest exceedance frequency get zero
         Invalid exceedance return periods get NaN
         """
 
@@ -312,23 +312,60 @@ class YearEventLossTable:
                          index=pd.Index(return_periods, name='ReturnPeriod'),
                          name='Loss')
 
-    def to_ep_summaries(self, return_periods, is_eef=True,
-                        colname_aep='YearLoss', colname_oep='MaxEventLoss',
-                        colname_eef='EventLoss', **kwargs):
+    def to_ep_summaries(self, return_periods, is_aep=True, is_oep=True,
+                        is_eef=False, splitby=None, colname_aep='YearLoss',
+                        colname_oep='MaxEventLoss', colname_eef='EventLoss',
+                        **kwargs):
         """Return a dataframe with multiple EP curves side by side"""
 
-        aep = self.to_ep_summary(return_periods, is_occurrence=False, **kwargs)
-        oep = self.to_ep_summary(return_periods, is_occurrence=True, **kwargs)
+        if not is_aep and not is_oep and not is_eef:
+            raise Exception("Must specify one of is_aep, is_oep, is_eef")
 
-        aep = aep.rename(colname_aep)
-        oep = oep.rename(colname_oep)
+        # Optionally split based in a specific index value
+        if splitby is not None:
+
+            # Loop through each value of the splitby field
+            ep_curves = []
+            keys = []
+            for split_id in self._obj.index.get_level_values(splitby).unique():
+
+                # Call this function on the subset of the YELT
+                yelt_sub = self._obj.xs(split_id, level=splitby)
+                ep_curves.append(yelt_sub.yel.to_ep_summaries(return_periods,
+                                                              is_aep, is_oep,
+                                                              is_eef, None,
+                                                              colname_aep,
+                                                              colname_oep,
+                                                              colname_eef,
+                                                              **kwargs))
+                keys.append(split_id)
+            if isinstance(splitby, str):
+                splitby = [splitby]
+            return (pd.concat(ep_curves, keys=keys, axis=1,
+                              names=splitby)
+                    .swaplevel(0, -1, axis=1)
+                    )
+
+        combined = []
+        keys = []
+        if is_aep:
+            aep = self.to_ep_summary(return_periods, is_occurrence=False,
+                                     **kwargs)
+            keys.append(colname_aep)
+            combined.append(aep)
+
+        if is_oep:
+            oep = self.to_ep_summary(return_periods, is_occurrence=True,
+                                     **kwargs)
+            keys.append(colname_oep)
+            combined.append(oep)
 
         if is_eef:
             eef = self.to_ef_summary(return_periods, **kwargs)
-            eef = eef.rename(colname_eef)
-            combined = pd.concat([aep, oep, eef], axis=1)
-        else:
-            combined = pd.concat([aep, oep], axis=1)
+            keys.append(colname_eef)
+            combined.append(eef)
+
+        combined = pd.concat(combined, axis=1, keys=keys, names=['CurveType'])
 
         return combined
 
@@ -531,6 +568,16 @@ class YearEventLossTables:
                            axis=1)
 
         losses.columns = self._obj.columns
+
+        return losses
+
+    def to_ep_summaries(self, return_periods, **kwargs):
+        """Get multiple EP curves on the same return period scale"""
+        losses = pd.concat([self._obj[c].yel.to_ep_summaries(return_periods,
+                                                             **kwargs)
+                            for c in self._obj.columns],
+                           axis=1, keys=self._obj.columns,
+                           names=['LossPerspective'])
 
         return losses
 

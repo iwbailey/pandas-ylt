@@ -128,6 +128,26 @@ class YearEventLossTable:
         else:
             return yrgroup.sum()
 
+    def to_ylt_subsets(self, splitby=None, is_occurrence=False):
+        """Partition into YLTs based on one of the indices"""
+
+        if splitby is None:
+            return self.to_ylt(is_occurrence)
+
+        yrgroup = (self._obj
+                   .unstack(level=splitby, fill_value=0.0)
+                   .groupby(self.col_year)
+                   )
+
+        if is_occurrence:
+            ylts = yrgroup.max()
+        else:
+            ylts = yrgroup.sum()
+
+        ylts.attrs['n_yrs'] = self.n_yrs
+
+        return ylts
+
     def exfreq(self, **kwargs):
         """For each loss calculate the frequency >= loss
 

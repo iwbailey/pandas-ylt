@@ -128,8 +128,8 @@ class YearEventLossTable:
         else:
             return yrgroup.sum()
 
-    def to_ylt_subsets(self, splitby=None, is_occurrence=False):
-        """Partition into YLTs based on one of the indices"""
+    def to_ylt_partitioned(self, splitby=None, is_occurrence=False):
+        """Convert to YLT but split the loss into columns based on one index"""
 
         if splitby is None:
             return self.to_ylt(is_occurrence)

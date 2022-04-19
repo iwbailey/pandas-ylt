@@ -1,5 +1,6 @@
 """Module for working with year event loss table, where event loss is allocated.
 """
+from collections.abc import Iterable
 import pandas as pd
 from .yearloss import VALID_YEAR_COLNAMES_LC
 
@@ -8,10 +9,10 @@ from .yearloss import VALID_YEAR_COLNAMES_LC
 class YearEventAllocLossTable:
     """A more granular version of a YELT where the event loss is allocated.
 
-    The series should have an attribute called 'colEvent' that contains a list
+    The series should have an attribute called 'col_event' that contains a list
     of which index columns define a single event.
 
-    The series can have an attribute called 'colYear' that defines which is the
+    The series can have an attribute called 'col_year' that defines which is the
     index column for the year
     """
     def __init__(self, pandas_obj):
@@ -38,7 +39,9 @@ class YearEventAllocLossTable:
                                  "to specify which index columns define a " +
                                  "unique event.")
 
-        # TODO: Check col_event is a list
+        if (isinstance(obj.attrs['col_event'], str)
+                or not isinstance(obj.attrs['col_event'], Iterable)):
+            raise TypeError("attrs 'col_event' should be an iterable")
 
         # All event columns are in the multi-index
         if not all(c in obj.index.names for c in obj.attrs['col_event']):
@@ -88,11 +91,16 @@ class YearEventAllocLossTable:
 
     def to_subset(self, **kwargs):
         """Get a version of the YEAL, filtered to certain index levels"""
-        this_yealt = self.obj
+        this_yealt = self._obj
         for k in kwargs:
-            this_yealt = this_yealt.loc[
-                this_yealt.index.get_level_values(k).isin(kwargs[k]), :
-            ]
+            try:
+                this_yealt = this_yealt.loc[
+                    this_yealt.index.get_level_values(k).isin(kwargs[k]), :]
+
+            except TypeError:
+                this_yealt = this_yealt.loc[
+                    this_yealt.index.get_level_values(k) == kwargs[k], :]
+
         return this_yealt
 
     def to_yelt(self, **kwargs):
@@ -105,7 +113,7 @@ class YearEventAllocLossTable:
         filtered_yealt = self.to_subset(**kwargs)
 
         # Group and sum
-        yelt = filtered_yealt.groupby([self.colYear] + self.colEvent).sum()
+        yelt = filtered_yealt.groupby([self.col_year] + self.col_event).sum()
 
         return yelt
 
@@ -117,12 +125,12 @@ class YearEventAllocLossTable:
 
         # Group and sum
         if is_occurrence:
-            ylt = (self.to_yelt(**kwargs).groupby(self.colYear).max())
+            ylt = (self.to_yelt(**kwargs).groupby(self.col_year).max())
         else:
             # Calculate the subset of the yealt for each specified index
             filtered_yealt = self.to_subset(**kwargs)
 
-            ylt = filtered_yealt.groupby(self.colYear).sum()
+            ylt = filtered_yealt.groupby(self.col_year).sum()
 
         return ylt
 
@@ -147,7 +155,7 @@ class YearEventAllocLossTable:
             filtered_yealt = self.to_subset(**kwargs)
 
             groupcols = [c for c in self.obj.index.names if
-                         c not in self.colEvent]
+                         c not in self.col_event]
             yalt = filtered_yealt.groupby(groupcols).sum()
 
         return yalt
@@ -160,7 +168,7 @@ class YearEventAllocLossTable:
         filtered_yealt = self.to_subset(**filterby)
 
         # Group to the allocation columns
-        this_yealt = filtered_yealt.groupby([self.colYear] + self.colEvent +
+        this_yealt = filtered_yealt.groupby([self.col_year] + self.col_event +
                                             groupby).sum()
 
         # Get the year allocation table

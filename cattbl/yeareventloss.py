@@ -1,4 +1,4 @@
-"""Module for working with a period event loss table"""
+"""Module for working with a year event loss table"""
 import warnings
 import pandas as pd
 import numpy as np

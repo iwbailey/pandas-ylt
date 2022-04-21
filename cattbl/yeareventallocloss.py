@@ -2,7 +2,7 @@
 """
 from collections.abc import Iterable
 import pandas as pd
-from .yearloss import VALID_YEAR_COLNAMES_LC
+from cattbl.yearloss import VALID_YEAR_COLNAMES_LC
 
 
 @pd.api.extensions.register_series_accessor("yeal")
@@ -48,7 +48,6 @@ class YearEventAllocLossTable:
             raise AttributeError("Not all specified event columns are in the " +
                                  "multi-index")
 
-
         if not obj.index.is_unique:
             raise AttributeError("Index is not unique")
 
@@ -83,6 +82,10 @@ class YearEventAllocLossTable:
     def is_valid(self):
         """Dummy function to run the validation check"""
         return True
+
+    @property
+    def n_yrs(self):
+        return self._obj.attrs['n_yrs']
 
     @property
     def col_event(self):
@@ -156,7 +159,7 @@ class YearEventAllocLossTable:
 
             groupcols = [c for c in self.obj.index.names if
                          c not in self.col_event]
-            yalt = filtered_yealt.groupby(groupcols).sum()
+            yalt = filtered_yealt.groupby(groupcols, observed=True).sum()
 
         return yalt
 
@@ -169,7 +172,7 @@ class YearEventAllocLossTable:
 
         # Group to the allocation columns
         this_yealt = filtered_yealt.groupby([self.col_year] + self.col_event +
-                                            groupby).sum()
+                                            groupby, observed=True).sum()
 
         # Get the year allocation table
 

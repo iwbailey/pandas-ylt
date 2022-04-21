@@ -53,7 +53,9 @@ class TestYEALT(unittest.TestCase):
         """Test we can extract a YLT"""
         ylt = self.example_yealt.yeal.to_ylt()
 
-        print(ylt.sum(), self.example_yealt.sum())
+        self.assertLessEqual(len(ylt), self.example_yealt.yeal.n_yrs)
+        self.assertAlmostEqual(ylt.sum(), self.example_yealt.sum(), places=6)
+
 
 if __name__ == '__main__':
     unittest.main()

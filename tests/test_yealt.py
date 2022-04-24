@@ -56,6 +56,43 @@ class TestYEALT(unittest.TestCase):
         self.assertLessEqual(len(ylt), self.example_yealt.yeal.n_yrs)
         self.assertAlmostEqual(ylt.sum(), self.example_yealt.sum(), places=6)
 
+    def test_ylt_maxocc(self):
+        """Test getting the max event loss per year"""
+        ylt_max = self.example_yealt.yeal.to_ylt(is_occurrence=True)
+        ylt = self.example_yealt.yeal.to_ylt()
+
+        self.assertCountEqual(ylt_max.index, ylt.index)
+        self.assertTrue((ylt >= ylt_max).all())
+        self.assertTrue(ylt.sum() != ylt_max.sum())
+
+    def test_yalt_aep(self):
+        """Test year allocated loss table"""
+        yalt = self.example_yealt.yeal.to_yalt()
+
+        ylt = self.example_yealt.yeal.to_ylt()
+
+        check_allocation = (yalt.rename('Alloc').to_frame()
+                            .join(ylt)
+                            .assign(ppn=lambda df:df['Alloc'] / df['Loss']))
+
+        self.assertLess((check_allocation.groupby('Year')['ppn'].sum() - 1)
+                        .abs().max(),
+                        1e-12)
+
+    def test_yalt_oep(self):
+        """Test year allocated loss table"""
+        yalt = self.example_yealt.yeal.to_yalt(is_occurrence=True)
+
+        ylt = self.example_yealt.yeal.to_ylt(is_occurrence=True)
+
+        check_allocation = (yalt.rename('Alloc').to_frame()
+                            .join(ylt)
+                            .assign(ppn=lambda df:df['Alloc'] / df['Loss']))
+
+        self.assertLess((check_allocation.groupby('Year')['ppn'].sum() - 1)
+                        .abs().max(),
+                        1e-12)
+
 
 if __name__ == '__main__':
     unittest.main()

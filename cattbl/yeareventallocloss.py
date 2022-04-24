@@ -13,7 +13,8 @@ class YearEventAllocLossTable:
     of which index columns define a single event.
 
     The series can have an attribute called 'col_year' that defines which is the
-    index column for the year
+    index column for the year. Otherwise, the year column is guessed based on
+    candidate names
     """
     def __init__(self, pandas_obj):
         """Initialise"""
@@ -25,7 +26,7 @@ class YearEventAllocLossTable:
 
     @staticmethod
     def _validate(obj):
-        """Check key requirments for this to work"""
+        """Check key requirements for this to work"""
 
         # Check it is a numeric series
         if not pd.api.types.is_numeric_dtype(obj):
@@ -93,16 +94,17 @@ class YearEventAllocLossTable:
         return self._obj.attrs['col_event']
 
     def to_subset(self, **kwargs):
-        """Get a version of the YEAL, filtered to certain index levels"""
+        """Get a version of the YEALT, filtered to certain index levels"""
         this_yealt = self._obj
         for k in kwargs:
-            try:
+            if (not isinstance(kwargs[k], Iterable)
+                    or isinstance(kwargs[k], str)):
+                # Filtering on a single value
+                this_yealt = this_yealt.xs(kwargs[k], level=k, drop_level=False)
+            else:
+                # Filtering on a list of values
                 this_yealt = this_yealt.loc[
                     this_yealt.index.get_level_values(k).isin(kwargs[k]), :]
-
-            except TypeError:
-                this_yealt = this_yealt.loc[
-                    this_yealt.index.get_level_values(k) == kwargs[k], :]
 
         return this_yealt
 
@@ -138,31 +140,37 @@ class YearEventAllocLossTable:
         return ylt
 
     def to_yalt(self, is_occurrence=False, **kwargs):
-        """Return a year loss table allocated"""
+        """Collapse the events to get a year loss table allocated among the
+        other indices"""
 
-        # Group and sum
-        if is_occurrence:
-            raise Exception("is_occurrence not yet implemented")
+        # Calculate the subset of the yealt for each specified index
+        filtered_yealt = self.to_subset(**kwargs)
 
-            filtered_yealt = self.to_subset(**kwargs)
+        # Group by everything excep the events
+        groupcols = [c for c in self._obj.index.names if
+                     c not in self.col_event]
 
-            # Isolate the events
-            ylt = self.to_ylt(is_occurrence=True, **kwargs)
-
-            # Return only those events
-
-            yalt = ylt.join(filtered_yealt, how='inner')
-
-        else:
-            # Calculate the subset of the yealt for each specified index
-            filtered_yealt = self.to_subset(**kwargs)
-
-            groupcols = [c for c in self.obj.index.names if
-                         c not in self.col_event]
+        if not is_occurrence:
+            # Group and sum
             yalt = filtered_yealt.groupby(groupcols, observed=True).sum()
 
-        return yalt
+        else:
+            # Identify the max event loss per year, then keep only those events
+            filtered_yelt = filtered_yealt.yeal.to_yelt()
+            filtered_yelt = (filtered_yelt
+                             .sort_values(ascending=False)
+                             .reset_index()
+                             .groupby('Year').first()
+                             .set_index(self.col_event, append=True))
 
+            # Return only those events
+            yalt = (filtered_yealt.to_frame()
+                .join(filtered_yelt[self._obj.name].rename('loss2'), how='inner')
+                .reset_index()
+                .set_index(groupcols)[self._obj.name]
+                )
+
+        return yalt
 
     def to_ep_contrib(self, is_occurrence=False, filterby=None, groupby=None):
         """Return the contributors to each year of an EP curve"""

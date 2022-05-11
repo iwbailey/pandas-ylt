@@ -173,6 +173,14 @@ class YearEventLossTable:
                 .rename('CProb')
                 )
 
+    def to_maxloss_yelt(self):
+        """Return a YELT with only the maximum event loss in a year"""
+
+        return (self._obj
+                .sort_values(ascending=False)
+                .groupby(self.col_year)
+                .head(1))
+
     def to_ef_curve(self, keep_index=False, col_exfreq='ExFreq',
                     new_index_name='Order', **kwargs):
         """Return an Exceedance frequency curve

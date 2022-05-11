@@ -281,6 +281,21 @@ class TestYELTmethods(unittest.TestCase):
         self.assertIsInstance(loss_ef.index, pd.RangeIndex,
                               msg="Expecting a range index for EF curve")
 
+    def test_max_ev_loss(self):
+        """Test we can get the max event loss for any year"""
+
+        yelt2 = self.test_yelt.yel.to_maxloss_yelt()
+
+        # Check indices are preserved
+        self.assertCountEqual(yelt2.index.names, self.test_yelt.index.names)
+
+        # Check same values as if we compute the YLT on occurrence basis
+        ylt = self.test_yelt.yel.to_ylt(is_occurrence=True)
+
+        cmp = yelt2.rename('Loss1').to_frame().join(ylt.rename('Loss2'),
+                                                    how='outer').fillna(0.0)
+        vs = (cmp['Loss1'] - cmp['Loss2']).abs()
+        self.assertTrue(vs.max() < 1e-8)
 
 # TODO: Test we can handle an EEF curve with negative loss
 

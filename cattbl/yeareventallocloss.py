@@ -3,10 +3,11 @@
 from collections.abc import Iterable
 import pandas as pd
 from cattbl.yearloss import VALID_YEAR_COLNAMES_LC
+from cattbl.base_classes import LossSeries
 
 
 @pd.api.extensions.register_series_accessor("yeal")
-class YearEventAllocLossTable:
+class YearEventAllocLossTable(LossSeries):
     """A more granular version of a YELT where the event loss is allocated.
 
     The series should have an attribute called 'col_event' that contains a list
@@ -18,8 +19,8 @@ class YearEventAllocLossTable:
     """
     def __init__(self, pandas_obj):
         """Initialise"""
+        super().__init__(pandas_obj)
         self._validate(pandas_obj)
-        self._obj = pandas_obj
 
         self.col_year = self._init_col_year(pandas_obj)
         self._validate_years(pandas_obj, self.col_year)
@@ -27,13 +28,6 @@ class YearEventAllocLossTable:
     @staticmethod
     def _validate(obj):
         """Check key requirements for this to work"""
-
-        # Check it is a numeric series
-        if not pd.api.types.is_numeric_dtype(obj):
-            raise TypeError(f"Series should be numeric. It is {obj.dtype}")
-
-        if 'n_yrs' not in obj.attrs.keys():
-            raise AttributeError("Must have 'n_yrs' in the series attrs")
 
         if 'col_event' not in obj.attrs.keys():
             raise AttributeError("Must have 'col_event' in the series attrs " +
@@ -48,9 +42,6 @@ class YearEventAllocLossTable:
         if not all(c in obj.index.names for c in obj.attrs['col_event']):
             raise AttributeError("Not all specified event columns are in the " +
                                  "multi-index")
-
-        if not obj.index.is_unique:
-            raise AttributeError("Index is not unique")
 
         # TODO: check indices
 
@@ -78,15 +69,6 @@ class YearEventAllocLossTable:
         if obj.index.get_level_values(col_year).min() < 1 or \
                 obj.index.get_level_values(col_year).max() > obj.attrs['n_yrs']:
             raise AttributeError("Years in index are out of range 1,n_yrs")
-
-    @property
-    def is_valid(self):
-        """Dummy function to run the validation check"""
-        return True
-
-    @property
-    def n_yrs(self):
-        return self._obj.attrs['n_yrs']
 
     @property
     def col_event(self):

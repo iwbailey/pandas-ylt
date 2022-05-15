@@ -8,8 +8,6 @@ Python modules for working in pandas with various loss data tables used for CAT 
 
 I use a virtual environment. You can see requirements in the file `requirements.txt`
 
-For linux you need odbc headers which can be found in `unixodbc-dev`
-
 You can install locally with
 
 ```
@@ -28,6 +26,8 @@ Then help on each module.
 
 
 ## Versions
+### v0.2.0
+Introduction of base class
 ### v0.1.1
 Removed the "t" from accessor names, i.e. changed names of accessors to yel and yl
 ### v0.1.0

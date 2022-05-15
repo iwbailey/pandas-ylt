@@ -1,5 +1,7 @@
 """Test the ylt module is working as expected"""
 import unittest
+
+import cattbl.yearloss
 from cattbl import yearloss as ylt
 import pandas as pd
 import numpy as np
@@ -34,7 +36,8 @@ class TestYLT(unittest.TestCase):
                       msg="Expected num years in attrs")
 
         # Check we pass the validation checks
-        self.assertTrue(ylt_series.yl.is_valid)
+        tmp = ylt.YearLossTable(ylt_series)
+        self.assertIsInstance(tmp, cattbl.yearloss.YearLossTable)
 
     def test_calc_aal(self):
         """Test calculation of AAL"""

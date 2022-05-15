@@ -2,6 +2,7 @@ import unittest
 import os
 import pandas as pd
 
+import cattbl.yeareventloss
 from cattbl import yeareventloss as yelt
 from cattbl.yearloss import YearLossTable  # Import for the decorator
 
@@ -10,6 +11,28 @@ IFILE_TEST_YELT = os.path.join(os.path.dirname(__file__),
                                "_data",
                                "example_pareto_poisson_yelt.csv")
 TEST_YELT_N_YEARS = 1e5
+
+
+class TestIdentifyIndices(unittest.TestCase):
+    """Test functions that identify indices"""
+    def test_identify_year_col(self):
+        """Test we pick out the preferred column"""
+        index_names = ['Year', 'EventID']
+        self.assertEqual(yelt.identify_year_col(index_names), 'Year')
+
+    def test_identify_year_col_ambig(self):
+        """Test we pick out the preferred column"""
+        index_names = ['Year', 'Period', 'EventID']
+        self.assertEqual(yelt.identify_year_col(index_names), 'Year')
+
+        index_names = ['Period', 'YearIdx', 'EventID']
+        self.assertEqual(yelt.identify_year_col(index_names), 'Period')
+
+    def test_year_lower_case(self):
+        """Test we can get it when lower case"""
+        index_names = ['year', 'EventID']
+        i = yelt.identify_year_col(index_names)
+        self.assertEqual(i, 'year')
 
 
 class TestCreateYELT(unittest.TestCase):
@@ -30,39 +53,33 @@ class TestCreateYELT(unittest.TestCase):
         ds = self.df.set_index(['Year', 'EventID', 'DayOfYear'])['Loss']
         ds.attrs['n_yrs'] = self.n_yrs
 
-        self.assertTrue(ds.yel.is_valid)
-
-    def test_from_cols(self):
-        """Test creation from the from_cols function"""
-        df = yelt.from_cols(
-            year=self.df.Year.values,
-            eventid=self.df.EventID.values,
-            dayofyear=self.df.DayOfYear.values,
-            loss=self.df.Loss.values,
-            n_yrs=self.n_yrs
-        )
-
-        self.assertTrue(df.yel.is_valid)
-
-    def test_invalid_key(self):
-        """Check raise an error with duplicate keys"""
-        with self.assertRaises(ValueError):
-            yelt.from_cols(year=[4, 4], eventid=[3, 3], dayofyear=[200, 200],
-                           loss=[2.0, 3.0], n_yrs=5)
+        self.assertIsInstance(yelt.YearEventLossTable(ds),
+                              cattbl.yeareventloss.YearEventLossTable)
 
     def test_from_df(self):
         """Test creation from the from_df function"""
 
         my_yelt = yelt.from_df(self.df, n_yrs=self.n_yrs)
 
-        self.assertTrue(my_yelt.yel.is_valid)
+        self.assertEqual(my_yelt.yel.n_yrs, self.n_yrs)
+
+    def test_invalid_key(self):
+        """Check raise an error with duplicate keys"""
+        with self.assertRaises(ValueError):
+            yelt.from_df(
+                    pd.DataFrame({'year': [4, 4],
+                                  'eventid': [3, 3],
+                                  'dayofyear': [200, 200],
+                                  'loss': [2.0, 3.0]}),
+                                 n_yrs=5,
+                                 colname_loss='loss')
 
     def test_from_df_with_years(self):
         # See if we can create using n_yrs as existing attribute
         df = self.df.copy()
         df.attrs['n_yrs'] = self.n_yrs
         my_yelt = yelt.from_df(df)
-        self.assertTrue(my_yelt.yel.is_valid)
+        self.assertEqual(my_yelt.yel.n_yrs, self.n_yrs)
 
     def test_from_csv(self):
         """Test we can create a YELT from the example file"""
@@ -70,7 +87,7 @@ class TestCreateYELT(unittest.TestCase):
         my_yelt = yelt.from_csv(IFILE_TEST_YELT,
                                 n_yrs=TEST_YELT_N_YEARS)
 
-        self.assertTrue(my_yelt.yel.is_valid)
+        self.assertEqual(my_yelt.yel.n_yrs, TEST_YELT_N_YEARS)
 
 
 class TestYELTprops(unittest.TestCase):
@@ -117,9 +134,6 @@ class TestYELTmethods(unittest.TestCase):
 
         this_ylt = self.test_yelt.yel.to_ylt()
 
-        # Check it is a valid YLT
-        self.assertTrue(this_ylt.yl.is_valid)
-
         # Check the AAL are equal
         self.assertAlmostEqual(self.test_yelt.yel.aal,
                                this_ylt.yl.aal)
@@ -128,9 +142,6 @@ class TestYELTmethods(unittest.TestCase):
         """Test we can convert to a year occurrence loss table"""
 
         this_ylt = self.test_yelt.yel.to_ylt(is_occurrence=True)
-
-        # Check it is a valid YLT
-        self.assertTrue(this_ylt.yl.is_valid)
 
         # Check all values are less or equal than the annual
         agg_ylt = self.test_yelt.yel.to_ylt()
@@ -192,8 +203,12 @@ class TestYELTmethods(unittest.TestCase):
         """Test a layer is applied correctly"""
 
         # Create a yelt
-        y = yelt.from_cols(year=[1, 1, 1, 1], eventid=range(4),
-                           dayofyear=range(1, 5), loss=[5, 7, 8, 10], n_yrs=1)
+        y = yelt.from_df(pd.DataFrame({
+            'year': [1, 1, 1, 1],
+            'EventID': range(4),
+            'dayofyear': range(1, 5),
+            'loss':[5, 7, 8, 10]}),
+                n_yrs=1, colname_loss='loss')
 
         # Test an upper limit
         self.assertTrue((y.yel.apply_layer(limit=5) == 5.0).all())

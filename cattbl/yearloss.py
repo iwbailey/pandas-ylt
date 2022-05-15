@@ -3,16 +3,18 @@
 import pandas as pd
 import numpy as np
 import warnings
+from cattbl.base_classes import LossSeries
 
-# List of valid index names for the year column
-VALID_YEAR_COLNAMES_LC = ('year', 'period', 'index', 'idx', 'yearidx',
+
+# List of valid index names for the year column in order of preference
+VALID_YEAR_COLNAMES_LC = ['year', 'period', 'yearidx',
                      'periodidx', 'year_idx', 'period_idx',
                      'yearnumber', 'periodnumber', 'yearno', 'periodno',
-                     'yearnum', 'periodnum')
+                     'yearnum', 'periodnum', 'index', 'idx']
 
 
 @pd.api.extensions.register_series_accessor("yl")
-class YearLossTable:
+class YearLossTable(LossSeries):
     """A year loss table as a pandas series accessor
 
     The series must have an index 'Year', a name 'Loss', and attribute 'n_yrs'
@@ -21,6 +23,7 @@ class YearLossTable:
     Years go from 1 to n_yrs. Missing years are assumed to have zero loss.
     """
     def __init__(self, pandas_obj):
+        super().__init__(pandas_obj)
         self._validate(pandas_obj)
         self._obj = pandas_obj
 
@@ -38,36 +41,9 @@ class YearLossTable:
     def _validate(obj):
         """Verify the name is Loss, index is Year, and attribute n_yrs"""
 
-        if not pd.api.types.is_integer_dtype(obj.index):
-            raise TypeError(f"Index must be integer. It is {obj.index.dtype}")
-
-        if not pd.api.types.is_numeric_dtype(obj):
-            raise TypeError(f"Series should be numeric. It is {obj.dtype}")
-
-        if 'n_yrs' not in obj.attrs.keys():
-            raise AttributeError("Must have 'n_yrs' in the series attrs")
-
-        if not obj.index.is_unique:
-            raise AttributeError("Index is not unique")
-
         # Check the years are within range 1, n_yrs
         if obj.index.min() < 1 or obj.index.max() > obj.attrs['n_yrs']:
             raise AttributeError("Years in index are out of range 1,n_yrs")
-
-    @property
-    def is_valid(self):
-        """Dummy function to run the validation check"""
-        return True
-
-    @property
-    def n_yrs(self):
-        """Return the number of years for the ylt"""
-        return self._obj.attrs['n_yrs']
-
-    @property
-    def aal(self):
-        """Return the average annual loss"""
-        return self._obj.sum() / self.n_yrs
 
     @property
     def std(self):

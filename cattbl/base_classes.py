@@ -18,13 +18,14 @@ class LossSeries:
             raise TypeError(f"Series should be numeric. It is {obj.dtype}")
 
         # Check indices can be unique and sortable
-        if any([pd.api.types.is_float_dtype(c) for c in obj.index.levels]):
-            warnings.warn("Float indices found which might cause errors: " +
-                            f"{[c.dtype for c in obj.index.levels]}")
+        if any((pd.api.types.is_float_dtype(c) for c in obj.index.levels)):
+            warnings.warn("Float indices found which might cause errors: ")
+            for this_level in obj.index_levels:
+                print(this_level.name, ":", this_level.dtype)
 
         # Check unique
         if not obj.index.is_unique:
-            raise AttributeError(f"Index not unique")
+            raise AttributeError("Index not unique")
 
         # Check n_yrs stored in attributes
         if 'n_yrs' not in obj.attrs.keys():
@@ -44,4 +45,3 @@ class LossSeries:
     def aal(self):
         """Return the average annual loss"""
         return self._obj.sum() / self.n_yrs
-

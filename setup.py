@@ -1,3 +1,4 @@
+"""Installation details for the cattbl package"""
 from setuptools import setup
 
 setup(

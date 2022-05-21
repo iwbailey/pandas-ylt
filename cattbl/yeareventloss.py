@@ -14,17 +14,23 @@ DEFAULT_COLNAME_LOSS = 'Loss'
 INDEX_NAMES = [DEFAULT_COLNAME_YEAR, COL_DAY, COL_EVENT]
 
 
-def identify_year_col(index_names, valid_yearcol_names=VALID_YEAR_COLNAMES_LC):
+def identify_year_col(index_names, valid_yearcol_names=None):
     """Identify which index column corresponds to the year, return the """
 
     # Check the default column name as priority
     if DEFAULT_COLNAME_YEAR in index_names:
-        return DEFAULT_COLNAME_YEAR
+        result = DEFAULT_COLNAME_YEAR
     elif DEFAULT_COLNAME_YEAR.lower() in index_names:
-        return DEFAULT_COLNAME_YEAR.lower()
+        result = DEFAULT_COLNAME_YEAR.lower()
+    else:
+        if valid_yearcol_names is None:
+            valid_yearcol_names = VALID_YEAR_COLNAMES_LC
 
-    # Find the first match in a lowercase comparison
-    return next(col for col in index_names if col.lower() in valid_yearcol_names)
+        # Find the first match in a lowercase comparison
+        result = next(col for col in index_names
+                      if col.lower() in valid_yearcol_names)
+
+    return result
 
 
 @pd.api.extensions.register_series_accessor("yel")
@@ -57,15 +63,18 @@ class YearEventLossTable(LossSeries):
 
     @property
     def col_year(self):
+        """The name of the column which stores the year"""
         return identify_year_col(self._obj.index.names)
 
     @property
     def col_loss(self):
         """Return the name of the loss column based on series name or default"""
         if self._obj.name is None:
-            return DEFAULT_COLNAME_LOSS
+            loss_col = DEFAULT_COLNAME_LOSS
         else:
-            return self._obj.name
+            loss_col = self._obj.name
+
+        return loss_col
 
     @property
     def event_index_names(self):
@@ -80,7 +89,7 @@ class YearEventLossTable(LossSeries):
     def to_ylt(self, is_occurrence=False):
         """Convert to a YLT
 
-        If is_occurrence return the max loss in a year. Otherwise return the
+        If is_occurrence return the max loss in a year. Otherwise, return the
         summed loss in a year.
         """
 
@@ -88,8 +97,8 @@ class YearEventLossTable(LossSeries):
 
         if is_occurrence:
             return yrgroup.max()
-        else:
-            return yrgroup.sum()
+
+        return yrgroup.sum()
 
     def to_ylt_partitioned(self, splitby=None, is_occurrence=False):
         """Convert to YLT but split the loss into columns based on one index"""
@@ -154,7 +163,7 @@ class YearEventLossTable(LossSeries):
         If keep_index=False, duplicate loss
         """
 
-        # Create the dataframe by combining loss with exfreq
+        # Create the dataframe by combining loss with exceedance frequency
         # TODO: is the copy necessary here?
         ef_curve = pd.concat([self._obj.copy()
                              .rename(self.col_loss),
@@ -166,10 +175,11 @@ class YearEventLossTable(LossSeries):
         ef_curve = (ef_curve
                     .reset_index()
                     .sort_values(by=[self.col_loss, col_exfreq, self.col_year] +
-                                     self.event_index_names,
+                                 self.event_index_names,
                                  ascending=[False, True, False] +
-                                 [False] * len(self.event_index_names))
-        )
+                                           [False] * len(self.event_index_names)
+                                 )
+                    )
 
         if not keep_index:
             ef_curve = ef_curve[[self.col_loss, col_exfreq]].drop_duplicates()
@@ -196,9 +206,10 @@ class YearEventLossTable(LossSeries):
         sev_curve = (sev_curve
                      .reset_index()
                      .sort_values(by=[self.col_loss, col_cprob, self.col_year] +
-                                      self.event_index_names,
+                                  self.event_index_names,
                                   ascending=[True, True, True] +
-                                            [True] * len(self.event_index_names)))
+                                            [True] * len(self.event_index_names)
+                                  ))
 
         if not keep_index:
             sev_curve = sev_curve[[self.col_loss, col_cprob]].drop_duplicates()
@@ -212,10 +223,10 @@ class YearEventLossTable(LossSeries):
     def loss_at_rp(self, return_periods, **kwargs):
         """Interpolate the year loss table for losses at specific return periods
 
-        :param return_periods: [numpy.array] should be ordered from largest to
-        smallest. A list will also work.
+        :param return_periods: [numpy.array] An array of return periods, which
+        should be ordered from largest to smallest. A list will also work.
 
-        :returns: [numpy.array] losses at the corresponding return periods
+        :returns: [numpy.array] losses at the corresponding return periods.
 
         The interpolation is done on exceedance frequency.
         Values below the smallest exceedance frequency get the max loss
@@ -240,14 +251,15 @@ class YearEventLossTable(LossSeries):
 
         return losses
 
-    def apply_layer(self, limit=None, xs=0.0, n_loss=None, is_franchise=False):
+    def apply_layer(self, limit=None, attach=0.0, n_loss=None,
+                    is_franchise=False):
         """Calculate the loss to a layer for each event"""
 
-        assert xs >= 0, "Lower loss must be >= 0"
+        assert attach >= 0, "Lower loss must be >= 0"
 
         # Apply layer attachment and limit
         layer_losses = (self._obj
-                        .subtract(xs).clip(lower=0.0)
+                        .subtract(attach).clip(lower=0.0)
                         .clip(upper=limit)
                         )
 
@@ -255,22 +267,22 @@ class YearEventLossTable(LossSeries):
         layer_losses = layer_losses.loc[layer_losses > 0]
 
         if is_franchise:
-            layer_losses += xs
+            layer_losses += attach
 
         # Apply occurrence limit
         if n_loss is not None:
             layer_losses = (layer_losses
                             .sort_index(level=[self.col_year] +
-                                               self.event_index_names)
+                                        self.event_index_names)
                             .groupby(self.col_year).head(n_loss)
                             )
 
         return layer_losses
 
     def layer_aal(self, **kwargs):
-        """Calculate the AAL within a layer
+        """Calculate the AAL within a layer.
 
-        :param kwargs: passed to .apply_layer
+        :param kwargs: passed to apply_layer.
         """
 
         layer_losses = self.apply_layer(**kwargs)
@@ -315,7 +327,7 @@ class YearEventLossTable(LossSeries):
         # Optionally split based in a specific index value
         if splitby is not None:
 
-            # Loop through each value of the splitby field
+            # Loop through each value of the 'splitby' field
             ep_curves = []
             keys = []
             for split_id in self._obj.index.get_level_values(splitby).unique():
@@ -373,42 +385,47 @@ class YearEventLossTable(LossSeries):
         return result
 
 
-def from_df(df, n_yrs=None, colname_loss=DEFAULT_COLNAME_LOSS):
+def from_df(dataframe, n_yrs=None, colname_loss=None):
     """Create a pandas Series YELT (Year Event Loss Table) from a DataFrame
 
-    :param df: [pandas.DataFrame] see from_cols for details of column names
+    :param dataframe: [pandas.DataFrame] see from_cols for details of column
+    names
 
     :param n_yrs: [int] the total number of years in the table
 
+    :param colname_loss: [str] the name of the loss column
+
     :returns: (pandas.Series) compatible with the accessor yelt
     """
+    if colname_loss is None:
+        colname_loss = DEFAULT_COLNAME_LOSS
 
-    if colname_loss not in df.columns:
+    if colname_loss not in dataframe.columns:
         raise KeyError(f'No column named {colname_loss}')
 
     if n_yrs is not None:
-        df.attrs['n_yrs'] = np.int64(n_yrs)
+        dataframe.attrs['n_yrs'] = np.int64(n_yrs)
 
     # Reset index in case
-    if df.index.name is not None:
-        df = df.reset_index(drop=False)
+    if dataframe.index.name is not None:
+        dataframe = dataframe.reset_index(drop=False)
 
     # Identify the year column
-    year_col = identify_year_col(df.columns)
+    year_col = identify_year_col(dataframe.columns)
 
     # Identify the event columns
-    event_cols = [c for c in df.columns
+    event_cols = [c for c in dataframe.columns
                   if c not in (year_col, colname_loss, None)]
 
     # Convert the types if necessary
     index_names = [year_col] + event_cols
     for col in index_names:
-        if not pd.api.types.is_integer_dtype(df[col]):
-            warnings.warn(f"{col} is {df[col].dtype} " +
+        if not pd.api.types.is_integer_dtype(dataframe[col]):
+            warnings.warn(f"{col} is {dataframe[col].dtype} " +
                           "and will be forced to int type")
-            df[col] = df[col].astype(np.int64)
+            dataframe[col] = dataframe[col].astype(np.int64)
 
-    yelt = df.set_index(index_names, verify_integrity=True)[colname_loss]
+    yelt = dataframe.set_index(index_names, verify_integrity=True)[colname_loss]
 
     return yelt
 
@@ -424,9 +441,9 @@ def from_csv(ifile, n_yrs):
     :returns: (pandas.Series) compatible with the accessor yelt
     """
 
-    df = pd.read_csv(ifile, usecols=INDEX_NAMES + [DEFAULT_COLNAME_LOSS])
+    dataframe = pd.read_csv(ifile, usecols=INDEX_NAMES + [DEFAULT_COLNAME_LOSS])
 
-    return from_df(df, n_yrs)
+    return from_df(dataframe, n_yrs)
 
 
 @pd.api.extensions.register_dataframe_accessor("yel")
@@ -446,9 +463,10 @@ class YearEventLossTables:
         """Check it is a valid YELT series"""
 
         # Check the dataframe is numeric
-        for c in obj.columns:
-            if not pd.api.types.is_numeric_dtype(obj[c]):
-                raise TypeError(f"All series should be numeric. {c} is {obj[c].dtype}")
+        for col in obj.columns:
+            if not pd.api.types.is_numeric_dtype(obj[col]):
+                raise TypeError("All series should be numeric. " +
+                                f"{col} is {obj[col].dtype}")
 
         # Validate the first series
         assert obj[obj.columns[0]].yel.n_yrs > 0
@@ -484,8 +502,8 @@ class YearEventLossTables:
 
         if is_occurrence:
             return yrgroup.max()
-        else:
-            return yrgroup.sum()
+
+        return yrgroup.sum()
 
     def to_ef_curves(self, col_exfreq='ExFreq', **kwargs):
         """Return exceedance frequency curves for each column
@@ -495,11 +513,12 @@ class YearEventLossTables:
 
         """
 
-        ef_curves = pd.concat([self._obj[c].yel.to_ef_curve(keep_index=False,
-                                                            col_exfreq=col_exfreq,
-                                                            **kwargs)
-                               for c in self._obj.columns],
-                              axis=1)
+        ef_curves = [self._obj[c].yel.to_ef_curve(keep_index=False,
+                                                  col_exfreq=col_exfreq,
+                                                  **kwargs)
+                     for c in self._obj.columns]
+
+        ef_curves = pd.concat(ef_curves, axis=1)
 
         ef_curves = ef_curves.fillna(0.0)
 
@@ -534,13 +553,15 @@ class YearEventLossTables:
 
         return losses
 
-    def to_aal_df(self, is_std=True, hide_columns=False, aal_name='AAL', std_name='STD'):
+    def to_aal_df(self, is_std=True, hide_columns=False, aal_name='AAL',
+                  std_name='STD'):
         """Return a pandas series with the AAL """
 
         result = pd.Series(self.aal, name=aal_name).to_frame().T
 
         if is_std:
-            stddev = [self._obj[c].yel.to_ylt().yl.std for c in self._obj.columns]
+            stddev = [self._obj[c].yel.to_ylt().yl.std
+                      for c in self._obj.columns]
 
             result = result.append(
                      pd.Series(stddev, name=std_name, index=self._obj.columns))

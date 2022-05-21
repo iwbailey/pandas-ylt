@@ -214,7 +214,7 @@ class TestYELTmethods(unittest.TestCase):
         self.assertTrue((y.yel.apply_layer(limit=5) == 5.0).all())
 
         # Test a lower threshold
-        tmp = y.yel.apply_layer(xs=8)
+        tmp = y.yel.apply_layer(attach=8)
 
         # Check we only get one non-zero value back
         self.assertEqual((tmp > 0.0).sum(), 1)
@@ -226,7 +226,7 @@ class TestYELTmethods(unittest.TestCase):
         self.assertEqual((y.yel.apply_layer(n_loss=1) > 0).sum(), 1)
 
         # Check all three combined
-        tmp = y.yel.apply_layer(limit=2, xs=6, n_loss=2)
+        tmp = y.yel.apply_layer(limit=2, attach=6, n_loss=2)
 
         # Should get only two losses
         self.assertEqual((tmp > 0).sum(), 2)
@@ -251,16 +251,16 @@ class TestYELTmethods(unittest.TestCase):
         self.assertLess(aal_upper, self.test_yelt.yel.aal)
 
         # Test a lower layer reduces the loss
-        aal_lower = self.test_yelt.yel.layer_aal(xs=loss1)
+        aal_lower = self.test_yelt.yel.layer_aal(attach=loss1)
         self.assertLess(aal_lower, self.test_yelt.yel.aal)
 
         # Test both lower and upper is lowest of all
-        aal_mid = self.test_yelt.yel.layer_aal(xs=loss1, limit=loss2)
+        aal_mid = self.test_yelt.yel.layer_aal(attach=loss1, limit=loss2)
         self.assertLess(aal_mid, aal_upper)
         self.assertLess(aal_mid, aal_lower)
 
         # Test reducing the number of losses reduces the aal
-        aal_mid_1loss = self.test_yelt.yel.layer_aal(xs=loss1, limit=loss2,
+        aal_mid_1loss = self.test_yelt.yel.layer_aal(attach=loss1, limit=loss2,
                                                       n_loss=1)
 
         self.assertLess(aal_mid_1loss, aal_mid)

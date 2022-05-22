@@ -22,14 +22,14 @@ def append_beta_params(elt, eps=1e-12, sd_lower=0.0):
     numpy.nan
     """
 
-    mu = elt['MeanLoss'] / elt['MaxLoss']
-    sd = (elt['StdDev']  / elt['MaxLoss']).clip(lower=sd_lower)
+    beta_mu = elt['MeanLoss'] / elt['MaxLoss']
+    beta_std = (elt['StdDev']  / elt['MaxLoss']).clip(lower=sd_lower)
 
-    elt['alpha'] = mu * ((mu * (1 - mu) / sd ** 2) - 1)
-    elt['beta'] = elt['alpha'] * (1 - mu) / mu
+    elt['alpha'] = beta_mu * ((beta_mu * (1 - beta_mu) / beta_std ** 2) - 1)
+    elt['beta'] = elt['alpha'] * (1 - beta_mu) / beta_mu
 
-    # Beta parameters aren't valid when mu or sd are less than threshold
-    elt.loc[(sd < eps) | (mu < eps), ['alpha', 'beta']] = np.nan
+    # Beta parameters aren't valid when beta_mu or beta_std are less than threshold
+    elt.loc[(beta_std < eps) | (beta_mu < eps), ['alpha', 'beta']] = np.nan
 
     return elt
 

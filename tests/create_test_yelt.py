@@ -6,19 +6,20 @@ import numpy as np
 THIS_DIR = os.path.dirname(__file__)
 print(THIS_DIR)
 
-def poisson_pareto_yelt(rs, freq0, n_years, min_loss, alpha):
+
+def poisson_pareto_yelt(random_state, freq0, n_years, min_loss, alpha):
     """Simulate and create a Poisson/Pareto YELT"""
     # Calculate number of events
-    n_events = rs.poisson(freq0 * n_years, 1)[0]
+    n_events = random_state.poisson(freq0 * n_years, 1)[0]
     print(f"n = {n_events} events")
 
     # Calculate time at which events occur
-    event_times = rs.uniform(low=1.0, high=n_years + 1, size=n_events)
+    event_times = random_state.uniform(low=1.0, high=n_years + 1, size=n_events)
     print(f"event time range: {event_times.min():.2f} -- " +
           f"{event_times.max():.2f}")
 
     # Calculate loss sizes
-    losses = min_loss * (1 + rs.pareto(alpha, n_events))
+    losses = min_loss * (1 + random_state.pareto(alpha, n_events))
     print(f"Loss from {losses.min():.2g} -- {losses.max():.2g}")
 
     # Build the DataFrame
@@ -62,10 +63,10 @@ def main():
     # Create a second YELT with two models and two losses
     ofilename2 = "_data/example_two_models_grossnet.csv"
     yelt2 = poisson_pareto_yelt(rng,
-                               freq0=1.0,  # Number of events per year
-                               n_years=n_years,
-                               min_loss=min_loss,
-                               alpha=1.5)
+                                freq0=1.0,  # Number of events per year
+                                n_years=n_years,
+                                min_loss=min_loss,
+                                alpha=1.5)
 
     # Stack the YELTs together
     yelt_combined = pd.concat([yelt, yelt2], axis=0, keys=['Model1', 'Model2'],
@@ -86,7 +87,7 @@ def main():
     print(f"Written to {ofilename2}")
 
     # Create a Year Event Allocated Loss Table where event loss has been split
-    print(f"Creating an allocated YELT among regions and loss sources")
+    print("Creating an allocated YELT among regions and loss sources")
     ofilename3 = "_data/example_allocated_loss.csv"
     yealt = yelt_combined[['GrossLoss']].copy()
     print(f"Total Loss: {yealt['GrossLoss'].sum():,.0f}")

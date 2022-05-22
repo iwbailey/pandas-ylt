@@ -3,7 +3,8 @@ import unittest
 import os
 import pandas as pd
 
-from cattbl.yeareventallocloss import YearEventAllocLossTable  # Import for the decorator
+# Import for the decorator
+from cattbl.yeareventallocloss import YearEventAllocLossTable
 
 
 IFILE_TEST_YELT = os.path.join(os.path.dirname(__file__),
@@ -13,13 +14,14 @@ TEST_YELT_N_YEARS = 1e5
 
 
 class TestYEALT(unittest.TestCase):
+    """Tests for the Year Event Allocated Loss Table"""
     def setUp(self) -> None:
         """Read the example yealt"""
         df = pd.read_csv(IFILE_TEST_YELT)
         df = df.set_index([c for c in df.columns if c != 'Loss'])['Loss']
         df.attrs['n_yrs'] = int(TEST_YELT_N_YEARS)
         # df.attrs['col_year'] = 'Year'
-        df.attrs['col_event'] =['ModelID', 'EventID', 'DayOfYear']
+        df.attrs['col_event'] = ['ModelID', 'EventID', 'DayOfYear']
         self.example_yealt = df
 
     def test_validate_example(self):
@@ -73,7 +75,7 @@ class TestYEALT(unittest.TestCase):
 
         check_allocation = (yalt.rename('Alloc').to_frame()
                             .join(ylt)
-                            .assign(ppn=lambda df:df['Alloc'] / df['Loss']))
+                            .assign(ppn=lambda df: df['Alloc'] / df['Loss']))
 
         self.assertLess((check_allocation.groupby('Year')['ppn'].sum() - 1)
                         .abs().max(),
@@ -87,7 +89,7 @@ class TestYEALT(unittest.TestCase):
 
         check_allocation = (yalt.rename('Alloc').to_frame()
                             .join(ylt)
-                            .assign(ppn=lambda df:df['Alloc'] / df['Loss']))
+                            .assign(ppn=lambda df: df['Alloc'] / df['Loss']))
 
         self.assertLess((check_allocation.groupby('Year')['ppn'].sum() - 1)
                         .abs().max(),

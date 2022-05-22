@@ -17,6 +17,7 @@ class TestYLT(unittest.TestCase):
         self.n_years = 10
 
     def get_default_ylt(self):
+        """Return the default YLT"""
         ylt_series = ylt.from_cols(
             year=self.ylt_in['Year'].values,
             loss=self.ylt_in['Loss'].values,

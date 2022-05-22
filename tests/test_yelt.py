@@ -1,8 +1,8 @@
+"""Tests for the year event loss table."""
 import unittest
 import os
 import pandas as pd
 
-import cattbl.yeareventloss
 from cattbl import yeareventloss as yelt
 from cattbl.yearloss import YearLossTable  # Import for the decorator
 
@@ -38,7 +38,7 @@ class TestIdentifyIndices(unittest.TestCase):
 class TestCreateYELT(unittest.TestCase):
     """Test we can create a YELT from various starting points"""
     def setUp(self) -> None:
-
+        """Set up the dataframe used in tests """
         # Example Data Frame
         self.df = pd.DataFrame({
             'Year': [1, 2, 4, 5],
@@ -54,7 +54,7 @@ class TestCreateYELT(unittest.TestCase):
         ds.attrs['n_yrs'] = self.n_yrs
 
         self.assertIsInstance(yelt.YearEventLossTable(ds),
-                              cattbl.yeareventloss.YearEventLossTable)
+                              yelt.YearEventLossTable)
 
     def test_from_df(self):
         """Test creation from the from_df function"""
@@ -71,8 +71,8 @@ class TestCreateYELT(unittest.TestCase):
                                   'eventid': [3, 3],
                                   'dayofyear': [200, 200],
                                   'loss': [2.0, 3.0]}),
-                                 n_yrs=5,
-                                 colname_loss='loss')
+                                  n_yrs=5,
+                                  colname_loss='loss')
 
     def test_from_df_with_years(self):
         # See if we can create using n_yrs as existing attribute
@@ -113,10 +113,10 @@ class TestYELTprops(unittest.TestCase):
 
     def test_freq(self):
         """Test we can calculate the frequency of a loss"""
-        f0 = self.test_yelt.yel.freq0
+        freq0 = self.test_yelt.yel.freq0
 
-        self.assertGreater(f0, 0.0)
-        self.assertAlmostEqual(f0,
+        self.assertGreater(freq0, 0.0)
+        self.assertAlmostEqual(freq0,
                                (self.test_yelt > 0).sum() / TEST_YELT_N_YEARS)
 
 
@@ -203,7 +203,7 @@ class TestYELTmethods(unittest.TestCase):
         """Test a layer is applied correctly"""
 
         # Create a yelt
-        y = yelt.from_df(pd.DataFrame({
+        this_yelt = yelt.from_df(pd.DataFrame({
             'year': [1, 1, 1, 1],
             'EventID': range(4),
             'dayofyear': range(1, 5),
@@ -211,10 +211,10 @@ class TestYELTmethods(unittest.TestCase):
                 n_yrs=1, colname_loss='loss')
 
         # Test an upper limit
-        self.assertTrue((y.yel.apply_layer(limit=5) == 5.0).all())
+        self.assertTrue((this_yelt.yel.apply_layer(limit=5) == 5.0).all())
 
         # Test a lower threshold
-        tmp = y.yel.apply_layer(attach=8)
+        tmp = this_yelt.yel.apply_layer(attach=8)
 
         # Check we only get one non-zero value back
         self.assertEqual((tmp > 0.0).sum(), 1)
@@ -223,10 +223,10 @@ class TestYELTmethods(unittest.TestCase):
         self.assertEqual(tmp.xs(3, level='EventID').iloc[0], 2.0)
 
         # Check the occurrence cuts of other events
-        self.assertEqual((y.yel.apply_layer(n_loss=1) > 0).sum(), 1)
+        self.assertEqual((this_yelt.yel.apply_layer(n_loss=1) > 0).sum(), 1)
 
         # Check all three combined
-        tmp = y.yel.apply_layer(limit=2, attach=6, n_loss=2)
+        tmp = this_yelt.yel.apply_layer(limit=2, attach=6, n_loss=2)
 
         # Should get only two losses
         self.assertEqual((tmp > 0).sum(), 2)
@@ -309,8 +309,8 @@ class TestYELTmethods(unittest.TestCase):
 
         cmp = yelt2.rename('Loss1').to_frame().join(ylt.rename('Loss2'),
                                                     how='outer').fillna(0.0)
-        vs = (cmp['Loss1'] - cmp['Loss2']).abs()
-        self.assertTrue(vs.max() < 1e-8)
+        loss_diff = (cmp['Loss1'] - cmp['Loss2']).abs()
+        self.assertTrue(loss_diff.max() < 1e-8)
 
 # TODO: Test we can handle an EEF curve with negative loss
 

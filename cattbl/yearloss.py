@@ -1,8 +1,8 @@
 """Module for working with a year loss table
 """
+import warnings
 import pandas as pd
 import numpy as np
-import warnings
 from cattbl.base_classes import LossSeries
 
 
@@ -28,14 +28,14 @@ class YearLossTable(LossSeries):
         self._obj = pandas_obj
 
         # Define the column names
-        self.colYear = self._obj.index.name
-        if self.colYear.lower() not in VALID_YEAR_COLNAMES_LC:
-            warnings.warn(f"Index col {self.colYear} is not from expected list " +
+        self.col_year = self._obj.index.name
+        if self.col_year.lower() not in VALID_YEAR_COLNAMES_LC:
+            warnings.warn(f"Index col {self.col_year} is not from expected list " +
                           f"{VALID_YEAR_COLNAMES_LC}")
 
-        self.colLoss = self._obj.name
-        if self.colLoss is None:
-            self.colLoss = 'Loss'
+        self.col_loss = self._obj.name
+        if self.col_loss is None:
+            self.col_loss = 'Loss'
 
     @staticmethod
     def _validate(obj):
@@ -88,17 +88,17 @@ class YearLossTable(LossSeries):
 
         # Get a YLT filled in with zero losses
         with_zeros = (self.to_ylt_filled(fill_value=0.0)
-                      .rename(self.colLoss))
+                      .rename(self.col_loss))
 
         # Get loss vs cumulative prop
         ecdf = pd.concat([with_zeros, with_zeros.yl.cprob(**kwargs)], axis=1)
 
         # Sort with loss ascending
-        ecdf = ecdf.reset_index().sort_values([self.colLoss, 'CProb',
-                                               self.colYear])
+        ecdf = ecdf.reset_index().sort_values([self.col_loss, 'CProb',
+                                               self.col_year])
 
         if not keep_years:
-            ecdf = ecdf.drop(self.colYear, axis=1).drop_duplicates()
+            ecdf = ecdf.drop(self.col_year, axis=1).drop_duplicates()
 
         # Reset index
         ecdf = ecdf.reset_index(drop=True)
@@ -128,7 +128,7 @@ class YearLossTable(LossSeries):
 
         # Get a YLT filled in with zero losses
         with_zeros = (self._obj.copy()
-                      .rename(self.colLoss)
+                      .rename(self.col_loss)
                       .reindex(range(1, int(self.n_yrs) + 1), fill_value=0.0))
 
         # Create the dataframe by combining loss with exprob
@@ -137,11 +137,11 @@ class YearLossTable(LossSeries):
 
         # Sort from largest to smallest loss
         ep_curve = ep_curve.reset_index().sort_values(
-            by=[self.colLoss, 'ExProb', self.colYear],
+            by=[self.col_loss, 'ExProb', self.col_year],
                 ascending=(False, True, False))
 
         if not keep_years:
-            ep_curve = ep_curve.drop(self.colYear, axis=1).drop_duplicates()
+            ep_curve = ep_curve.drop(self.col_year, axis=1).drop_duplicates()
 
         # Reset the index
         ep_curve = ep_curve.reset_index(drop=True)
@@ -167,7 +167,7 @@ class YearLossTable(LossSeries):
         ep_curve = self.to_ep_curve(method='first', **kwargs)
 
         # Get the max loss for the high return periods
-        max_loss = ep_curve[self.colLoss].iloc[0]
+        max_loss = ep_curve[self.col_loss].iloc[0]
 
         # Replace invalid return periods with NaN
         return_periods = np.array(return_periods).astype(float)
@@ -176,7 +176,7 @@ class YearLossTable(LossSeries):
         # Interpolate between the return periods
         losses = np.interp(1 / return_periods,
                            ep_curve['ExProb'],
-                           ep_curve[self.colLoss],
+                           ep_curve[self.col_loss],
                            left=max_loss, right=0.0)
 
         return losses

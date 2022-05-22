@@ -45,8 +45,6 @@ class YearEventAllocLossTable(LossSeries):
 
         # TODO: check indices
 
-        pass
-
     @staticmethod
     def _init_col_year(obj):
         """Return the index column name for the year"""
@@ -56,8 +54,8 @@ class YearEventAllocLossTable(LossSeries):
             col_year = next((c for c in obj.index.names
                              if c.lower() in VALID_YEAR_COLNAMES_LC), None)
             if col_year is None:
-                raise AttributeError("No valid year column in {}".format(
-                        obj.index.names))
+                raise AttributeError("No valid year column in " +
+                                     f"{obj.index.names}")
 
         return col_year
 
@@ -78,15 +76,15 @@ class YearEventAllocLossTable(LossSeries):
     def to_subset(self, **kwargs):
         """Get a version of the YEALT, filtered to certain index levels"""
         this_yealt = self._obj
-        for k in kwargs:
-            if (not isinstance(kwargs[k], Iterable)
-                    or isinstance(kwargs[k], str)):
+        for k, val in kwargs.items():
+            if (not isinstance(val, Iterable)
+                    or isinstance(val, str)):
                 # Filtering on a single value
-                this_yealt = this_yealt.xs(kwargs[k], level=k, drop_level=False)
+                this_yealt = this_yealt.xs(val, level=k, drop_level=False)
             else:
                 # Filtering on a list of values
                 this_yealt = this_yealt.loc[
-                    this_yealt.index.get_level_values(k).isin(kwargs[k]), :]
+                    this_yealt.index.get_level_values(k).isin(val), :]
 
         return this_yealt
 
@@ -147,10 +145,10 @@ class YearEventAllocLossTable(LossSeries):
 
             # Return only those events
             yalt = (filtered_yealt.to_frame()
-                .join(filtered_yelt[self._obj.name].rename('loss2'), how='inner')
-                .reset_index()
-                .set_index(groupcols)[self._obj.name]
-                )
+                    .join(filtered_yelt[self._obj.name].rename('loss2'),
+                          how='inner')
+                    .reset_index()
+                    .set_index(groupcols)[self._obj.name])
 
         return yalt
 
@@ -169,8 +167,4 @@ class YearEventAllocLossTable(LossSeries):
         # Calculate exceedence probabilities on the full curve
         exprobs = this_yealt.yeal.to_ylt(is_occurrence).yl.exprobs()
 
-
-
-        pass
-
-        return
+        # TODO: unfinished function

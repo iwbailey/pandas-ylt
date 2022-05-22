@@ -1,13 +1,14 @@
 """Test the ylt module is working as expected"""
 import unittest
 
-import cattbl.yearloss
-from cattbl import yearloss as ylt
 import pandas as pd
 import numpy as np
 
+from cattbl import yearloss as ylt
+
 
 class TestYLT(unittest.TestCase):
+    """Tests on the YearLossTable"""
     def setUp(self) -> None:
         """Define a basic ylt for testing"""
         self.ylt_in = pd.DataFrame({
@@ -38,7 +39,7 @@ class TestYLT(unittest.TestCase):
 
         # Check we pass the validation checks
         tmp = ylt.YearLossTable(ylt_series)
-        self.assertIsInstance(tmp, cattbl.yearloss.YearLossTable)
+        self.assertIsInstance(tmp, ylt.YearLossTable)
 
     def test_calc_aal(self):
         """Test calculation of AAL"""
@@ -119,7 +120,7 @@ class TestYLT(unittest.TestCase):
 
         # Check the cprobs are aligned with the series
         cprobs = ylt_series.yl.cprob()
-        self.assertTrue(all([c in ecdf['CProb'].values for c in cprobs]),
+        self.assertTrue(all((c in ecdf['CProb'].values for c in cprobs)),
                         'Expected all calculated cprobs to be in ecdf')
 
         # Check monotonically increasing
@@ -127,7 +128,7 @@ class TestYLT(unittest.TestCase):
                         ecdf['CProb'].is_monotonic_increasing)
 
     def test_ecdf_neg_losses(self):
-        # Check a case with negative losses
+        """Check a case with negative losses"""
         ylt2 = ylt.from_cols(year=[1, 2, 3, 4, 5], loss=[-1, 0, 0, 2, 3],
                              n_yrs=6)
         ecdf = ylt2.yl.to_ecdf()
@@ -171,6 +172,7 @@ class TestYLT(unittest.TestCase):
     def test_exprob_with_dup_losses(self):
         """Test we pick out the largest exceedance prob for duplicate losses"""
 
+        # TODO
         pass
 
 
@@ -191,7 +193,7 @@ class TestYLT(unittest.TestCase):
                               msg="Expecting a range index for EP curve")
 
     def test_ep_curve_with_years(self):
-        # Check with years that the other columns are not changed
+        """Check with years that the other columns are not changed"""
         self.test_ep_curve(False)
         ylt_series = self.get_default_ylt()
 

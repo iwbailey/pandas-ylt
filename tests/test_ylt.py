@@ -172,7 +172,7 @@ class TestYLT(unittest.TestCase):
     def test_exprob_with_dup_losses(self):
         """Test we pick out the largest exceedance prob for duplicate losses"""
 
-        # TODO
+        # TODO: check it works with duplicate loss
         pass
 
 

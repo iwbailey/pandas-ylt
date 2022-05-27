@@ -40,7 +40,7 @@ class TestCreateYELT(unittest.TestCase):
     def setUp(self) -> None:
         """Set up the dataframe used in tests """
         # Example Data Frame
-        self.df = pd.DataFrame({
+        self.example_yelt = pd.DataFrame({
             'Year': [1, 2, 4, 5],
             'EventID': [1, 2, 3, 4],
             'DayOfYear': [25, 60, 200, 143],
@@ -50,16 +50,17 @@ class TestCreateYELT(unittest.TestCase):
 
     def test_manually_created(self):
         """Test we can create a YELT from a series we create"""
-        ds = self.df.set_index(['Year', 'EventID', 'DayOfYear'])['Loss']
-        ds.attrs['n_yrs'] = self.n_yrs
+        yelt_as_series = self.example_yelt.set_index(['Year', 'EventID', 'DayOfYear'])
+        yelt_as_series = yelt_as_series['Loss']
+        yelt_as_series.attrs['n_yrs'] = self.n_yrs
 
-        self.assertIsInstance(yelt.YearEventLossTable(ds),
+        self.assertIsInstance(yelt.YearEventLossTable(yelt_as_series),
                               yelt.YearEventLossTable)
 
     def test_from_df(self):
         """Test creation from the from_df function"""
 
-        my_yelt = yelt.from_df(self.df, n_yrs=self.n_yrs)
+        my_yelt = yelt.from_df(self.example_yelt, n_yrs=self.n_yrs)
 
         self.assertEqual(my_yelt.yel.n_yrs, self.n_yrs)
 
@@ -75,10 +76,10 @@ class TestCreateYELT(unittest.TestCase):
                                   colname_loss='loss')
 
     def test_from_df_with_years(self):
-        # See if we can create using n_yrs as existing attribute
-        df = self.df.copy()
-        df.attrs['n_yrs'] = self.n_yrs
-        my_yelt = yelt.from_df(df)
+        """See if we can create using n_yrs as existing attribute"""
+        yelt_with_years = self.example_yelt.copy()
+        yelt_with_years.attrs['n_yrs'] = self.n_yrs
+        my_yelt = yelt.from_df(yelt_with_years)
         self.assertEqual(my_yelt.yel.n_yrs, self.n_yrs)
 
     def test_from_csv(self):
@@ -137,6 +138,8 @@ class TestYELTmethods(unittest.TestCase):
         # Check the AAL are equal
         self.assertAlmostEqual(self.test_yelt.yel.aal,
                                this_ylt.yl.aal)
+
+        self.assertIsInstance(YearLossTable(this_ylt), YearLossTable)
 
     def test_to_occ_ylt(self):
         """Test we can convert to a year occurrence loss table"""

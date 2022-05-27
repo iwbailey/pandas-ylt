@@ -316,61 +316,79 @@ class YearEventLossTable(LossSeries):
                          name='Loss')
 
     def to_ep_summaries(self, return_periods, is_aep=True, is_oep=True,
-                        is_eef=False, splitby=None, colname_aep='YearLoss',
-                        colname_oep='MaxEventLoss', colname_eef='EventLoss',
-                        **kwargs):
+                        is_eef=False, **kwargs):
         """Return a dataframe with multiple EP curves side by side"""
 
         if not is_aep and not is_oep and not is_eef:
             raise Exception("Must specify one of is_aep, is_oep, is_eef")
 
-        # Optionally split based in a specific index value
-        if splitby is not None:
-
-            # Loop through each value of the 'splitby' field
-            ep_curves = []
-            keys = []
-            for split_id in self._obj.index.get_level_values(splitby).unique():
-
-                # Call this function on the subset of the YELT
-                yelt_sub = self._obj.xs(split_id, level=splitby)
-                ep_curves.append(yelt_sub.yel.to_ep_summaries(return_periods,
-                                                              is_aep, is_oep,
-                                                              is_eef, None,
-                                                              colname_aep,
-                                                              colname_oep,
-                                                              colname_eef,
-                                                              **kwargs))
-                keys.append(split_id)
-            if isinstance(splitby, str):
-                splitby = [splitby]
-            return (pd.concat(ep_curves, keys=keys, axis=1,
-                              names=splitby)
-                    .swaplevel(0, -1, axis=1)
-                    )
-
         combined = []
         keys = []
+
+        # Calculate the AEP summary
         if is_aep:
             aep = self.to_ep_summary(return_periods, is_occurrence=False,
                                      **kwargs)
-            keys.append(colname_aep)
+
+            if 'colname_aep' in kwargs:
+                keys.append(kwargs.get('colname_aep'))
+            else:
+                keys.append('YearLoss')
+
             combined.append(aep)
 
+        # Calculate the OEP summary
         if is_oep:
             oep = self.to_ep_summary(return_periods, is_occurrence=True,
                                      **kwargs)
-            keys.append(colname_oep)
+
+            if 'colname_oep' in kwargs:
+                keys.append(kwargs.get('colname_oep'))
+            else:
+                keys.append('MaxEventLoss')
+
             combined.append(oep)
 
+        # Calculate the EEF summary
         if is_eef:
             eef = self.to_ef_summary(return_periods, **kwargs)
-            keys.append(colname_eef)
+
+            if 'colname_eef' in kwargs:
+                keys.append(kwargs.get('colname_eef'))
+            else:
+                keys.append('EventLoss')
+
             combined.append(eef)
 
+        # Join them all together
         combined = pd.concat(combined, axis=1, keys=keys, names=['CurveType'])
 
         return combined
+
+    def to_subset_ep_summaries(self, return_periods, splitby=None, **kwargs):
+        """Create side-by-side EP summaries for subsets of the YELT indices."""
+
+        if splitby is None:
+            raise Exception("Must specify what to split the summaries by.")
+
+        # Loop through each value of the 'splitby' field
+        ep_curves = []
+        keys = []
+        for split_id in self._obj.index.get_level_values(splitby).unique():
+            # Call this function on the subset of the YELT
+            yelt_sub = self._obj.xs(split_id, level=splitby)
+            ep_curves.append(yelt_sub.yel.to_ep_summaries(return_periods,
+                                                          **kwargs))
+            keys.append(split_id)
+
+        # Make sure the splitby is a list
+        if isinstance(splitby, str):
+            splitby = [splitby]
+
+        return (pd.concat(ep_curves, keys=keys, axis=1,
+                          names=splitby)
+                .swaplevel(0, -1, axis=1)
+                )
 
     def to_aal_series(self, is_std=True, aal_name='AAL', std_name='STD'):
         """Return a pandas series with the AAL """
@@ -552,6 +570,17 @@ class YearEventLossTables:
                            names=['LossPerspective'])
 
         return losses
+
+    def to_subset_ep_summaries(self, return_periods, **kwargs):
+        """Get multiple EP curves on the same return period scale"""
+        losses = pd.concat([self._obj[c].yel.to_subset_ep_summaries(
+                            return_periods, **kwargs)
+                            for c in self._obj.columns],
+                           axis=1, keys=self._obj.columns,
+                           names=['LossPerspective'])
+
+        return losses
+
 
     def to_aal_df(self, is_std=True, hide_columns=False, aal_name='AAL',
                   std_name='STD'):

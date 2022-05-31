@@ -17,12 +17,13 @@ class TestYEALT(unittest.TestCase):
     """Tests for the Year Event Allocated Loss Table"""
     def setUp(self) -> None:
         """Read the example yealt"""
-        df = pd.read_csv(IFILE_TEST_YELT)
-        df = df.set_index([c for c in df.columns if c != 'Loss'])['Loss']
-        df.attrs['n_yrs'] = int(TEST_YELT_N_YEARS)
-        # df.attrs['col_year'] = 'Year'
-        df.attrs['col_event'] = ['ModelID', 'EventID', 'DayOfYear']
-        self.example_yealt = df
+        example_yealt = pd.read_csv(IFILE_TEST_YELT)
+        example_yealt = example_yealt.set_index([c for c in example_yealt.columns
+                                                 if c != 'Loss'])['Loss']
+        example_yealt.attrs['n_yrs'] = int(TEST_YELT_N_YEARS)
+        # example_yealt.attrs['col_year'] = 'Year'
+        example_yealt.attrs['col_event'] = ['ModelID', 'EventID', 'DayOfYear']
+        self.example_yealt = example_yealt
 
     def test_validate_example(self):
         """Check if the example is a valid yealt"""

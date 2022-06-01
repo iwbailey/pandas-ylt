@@ -164,7 +164,6 @@ class YearEventLossTable(LossSeries):
         """
 
         # Create the dataframe by combining loss with exceedance frequency
-        # TODO: is the copy necessary here?
         ef_curve = pd.concat([self._obj.copy()
                              .rename(self.col_loss),
                               self._obj.yel.exfreq(**kwargs)
@@ -195,7 +194,6 @@ class YearEventLossTable(LossSeries):
         """Return a severity curve. Cumulative prob of loss size."""
 
         # Create the dataframe by combining loss with cumulative probability
-        # TODO: is the copy necessary here?
         sev_curve = pd.concat([self._obj.copy()
                               .rename(self.col_loss),
                                self._obj.yel.cprob(**kwargs)

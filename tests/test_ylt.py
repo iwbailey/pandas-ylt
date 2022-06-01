@@ -172,9 +172,17 @@ class TestYLT(unittest.TestCase):
     def test_exprob_with_dup_losses(self):
         """Test we pick out the largest exceedance prob for duplicate losses"""
 
-        # TODO: check it works with duplicate loss
-        pass
+        this_ylt = ylt.from_cols(year=[1, 2, 3, 4, 5], loss=[1, 1, 1, 2, 2],
+                                 n_yrs=8)
 
+        # 3 years should get 5/8 and 2 years should get 2/8
+        expected = pd.Series([5, 5, 5, 2, 2], index=[1, 2, 3, 4, 5]) / 8
+        self.assertTrue(expected.equals(this_ylt.yl.exprob()))
+
+        # Expect the order to go losses descending, years descending
+        year_order = this_ylt.yl.to_ep_curve(keep_years=True)['Year'].values
+        expected_year_order = np.array([5, 4, 3, 2, 1, 8, 7, 6])
+        self.assertTrue(np.array_equal(expected_year_order, year_order))
 
     def test_ep_curve(self, keep_years=False):
         """Check the EP curve calculation"""

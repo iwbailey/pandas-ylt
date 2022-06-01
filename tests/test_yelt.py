@@ -315,7 +315,15 @@ class TestYELTmethods(unittest.TestCase):
         loss_diff = (cmp['Loss1'] - cmp['Loss2']).abs()
         self.assertTrue(loss_diff.max() < 1e-8)
 
-# TODO: Test we can handle an EEF curve with negative loss
+    def test_negative_losses(self):
+        """Test negative losses don't lead to an error"""
+        this_yelt = yelt.from_df(pd.DataFrame({
+            'Year': [1, 2, 2, 4, 5],
+            'EventID': [1, 2, 3, 4, 5],
+            'Loss': [-1, 0, 0, 2, 3],
+        }), n_yrs=6)
+
+        self.assertAlmostEqual(this_yelt.yel.freq0, 2 / 6)
 
 
 if __name__ == '__main__':

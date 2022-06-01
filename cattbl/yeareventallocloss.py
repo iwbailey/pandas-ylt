@@ -43,8 +43,6 @@ class YearEventAllocLossTable(LossSeries):
             raise AttributeError("Not all specified event columns are in the " +
                                  "multi-index")
 
-        # TODO: check indices
-
     @staticmethod
     def _init_col_year(obj):
         """Return the index column name for the year"""
@@ -152,19 +150,18 @@ class YearEventAllocLossTable(LossSeries):
 
         return yalt
 
-    def to_ep_contrib(self, is_occurrence=False, filterby=None, groupby=None):
-        """Return the contributors to each year of an EP curve"""
-
-        # Calculate the subset of the yealt for each specified index
-        filtered_yealt = self.to_subset(**filterby)
-
-        # Group to the allocation columns
-        this_yealt = filtered_yealt.groupby([self.col_year] + self.col_event +
-                                            groupby, observed=True).sum()
-
-        # Get the year allocation table
-
-        # Calculate exceedence probabilities on the full curve
-        exprobs = this_yealt.yeal.to_ylt(is_occurrence).yl.exprobs()
-
-        # TODO: unfinished function
+    # def to_ep_contrib(self, is_occurrence=False, filterby=None, groupby=None):
+    #     """Return the contributors to each year of an EP curve"""
+    #
+    #     # Calculate the subset of the yealt for each specified index
+    #     filtered_yealt = self.to_subset(**filterby)
+    #
+    #     # Group to the allocation columns
+    #     this_yealt = filtered_yealt.groupby([self.col_year] + self.col_event +
+    #                                         groupby, observed=True).sum()
+    #
+    #     # Get the year allocation table
+    #
+    #     # Calculate exceedence probabilities on the full curve
+    #     exprobs = this_yealt.yeal.to_ylt(is_occurrence).yl.exprobs()
+    #

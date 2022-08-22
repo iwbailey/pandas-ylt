@@ -71,6 +71,10 @@ class YearEventAllocLossTable(LossSeries):
         """Return the index column names for defining a unique event"""
         return self._obj.attrs['col_event']
 
+    def aal_split(self, groupby):
+        """Return the AAL, split by one of the indices"""
+        return self._obj.groupby(groupby).sum().divide(self.n_yrs).rename('AAL')
+    
     def to_subset(self, **kwargs):
         """Get a version of the YEALT, filtered to certain index levels"""
         this_yealt = self._obj
@@ -86,7 +90,7 @@ class YearEventAllocLossTable(LossSeries):
 
         return this_yealt
 
-    def to_yelt(self, **kwargs):
+    def to_yelt(self, splitby=None, **kwargs):
         """Output as a year event loss table
 
         kwargs can be used to specify the subset of allocation indices to use.
@@ -95,6 +99,10 @@ class YearEventAllocLossTable(LossSeries):
         # Calculate the subset of the yealt for each specified index
         filtered_yealt = self.to_subset(**kwargs)
 
+        if splitby is not None:
+            filtered_yealt = filtered_yealt.unstack(splitby)
+            filtered_yealt.attrs = self._obj.attrs
+        
         # Group and sum
         yelt = filtered_yealt.groupby([self.col_year] + self.col_event).sum()
 

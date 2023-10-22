@@ -336,7 +336,7 @@ class YearEventLossTable(LossSeries):
             if 'colname_aep' in kwargs:
                 keys.append(kwargs.get('colname_aep'))
             else:
-                keys.append('YearLoss')
+                keys.append('LossAEP')
 
             combined.append(aep)
 
@@ -348,7 +348,7 @@ class YearEventLossTable(LossSeries):
             if 'colname_oep' in kwargs:
                 keys.append(kwargs.get('colname_oep'))
             else:
-                keys.append('MaxEventLoss')
+                keys.append('LossOEP')
 
             combined.append(oep)
 
@@ -359,7 +359,7 @@ class YearEventLossTable(LossSeries):
             if 'colname_eef' in kwargs:
                 keys.append(kwargs.get('colname_eef'))
             else:
-                keys.append('EventLoss')
+                keys.append('LossEEF')
 
             combined.append(eef)
 

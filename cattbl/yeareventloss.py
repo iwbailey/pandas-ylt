@@ -43,7 +43,6 @@ class YearEventLossTable(LossSeries):
     """
     def __init__(self, pandas_obj, n_yrs=None):
         """Validate the series for use with accessor"""
-        
         if n_yrs is not None:
             pandas_obj.attrs['n_yrs'] = n_yrs
 
@@ -331,7 +330,7 @@ class YearEventLossTable(LossSeries):
         """Return a dataframe with multiple EP curves side by side"""
 
         if not is_aep and not is_oep and not is_eef:
-            raise Exception("Must specify one of is_aep, is_oep, is_eef")
+            raise ValueError("Must specify one of is_aep, is_oep, is_eef")
 
         combined = []
         keys = []
@@ -380,7 +379,7 @@ class YearEventLossTable(LossSeries):
         """Create side-by-side EP summaries for subsets of the YELT indices."""
 
         if splitby is None:
-            raise Exception("Must specify what to split the summaries by.")
+            raise ValueError("Must specify what to split the summaries by.")
 
         # Loop through each value of the 'splitby' field
         ep_curves = []
@@ -480,7 +479,7 @@ class YearEventLossTables:
     """Year event loss tables sharing the same index"""
     def __init__(self, pandas_obj, n_yrs=None):
         """Validate the dataframe for use with accessor"""
-        
+
         if n_yrs is not None:
             pandas_obj.attrs['n_yrs'] = n_yrs
 

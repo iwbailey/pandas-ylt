@@ -22,7 +22,10 @@ class YearLossTable(LossSeries):
 
     Years go from 1 to n_yrs. Missing years are assumed to have zero loss.
     """
-    def __init__(self, pandas_obj):
+    def __init__(self, pandas_obj, n_yrs=None):
+        if n_yrs is not None:
+            pandas_obj.attrs['n_yrs'] = n_yrs
+
         super().__init__(pandas_obj)
         self._validate(pandas_obj)
         self._obj = pandas_obj

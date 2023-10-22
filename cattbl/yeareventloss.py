@@ -223,11 +223,15 @@ class YearEventLossTable(LossSeries):
 
         return sev_curve
 
-    def loss_at_rp(self, return_periods, **kwargs):
+    def loss_at_rp(self, return_periods, is_interp=True, **kwargs):
         """Interpolate the year loss table for losses at specific return periods
 
         :param return_periods: [numpy.array] An array of return periods, which
         should be ordered from largest to smallest. A list will also work.
+
+        :param is_interp: [bool] interpolate between return periods. If False,
+        the loss for the next highest exceedance probability is returned.
+        Default is True.
 
         :returns: [numpy.array] losses at the corresponding return periods.
 
@@ -246,8 +250,12 @@ class YearEventLossTable(LossSeries):
         # Remove invalid return periods
         return_periods = np.array(return_periods).astype(float)
         return_periods[return_periods <= 0.0] = np.nan
+        exprobs = np.array(1.0 / return_periods)
 
-        losses = np.interp(1 / return_periods,
+        if not is_interp:
+            exprobs = np.ceil(exprobs * self.n_yrs) / self.n_yrs
+
+        losses = np.interp(exprobs,
                            ef_curve['ExFreq'],
                            ef_curve[self.col_loss],
                            left=max_loss, right=0.0)

@@ -155,11 +155,15 @@ class YearLossTable(LossSeries):
 
         return ep_curve
 
-    def loss_at_rp(self, return_periods, **kwargs):
+    def loss_at_rp(self, return_periods, is_interp=True, **kwargs):
         """Interpolate the year loss table for losses at specific return periods
 
         :param return_periods: [numpy.array] should be ordered from largest to
         smallest. A list will also work.
+
+        :param is_interp: [bool] the loss will be interpalated as a function of
+        exccedance probability (see below). Otherwise, the next highest
+        exceedance probability will be used. Default is True.
 
         :returns: [numpy.array] losses at the corresponding return periods
 
@@ -167,6 +171,14 @@ class YearLossTable(LossSeries):
         Values below the smallest exceedance probability get the max loss
         Values above the largest exceedance probability get zero
         Invalid exceedance return periods get NaN
+
+        If not interpolating, the curve would be considered as a stepwise
+        function. In this case you should go to the loss of the next highest
+        exceedance probabilty. e.g., for a 10k event set, a 1:30-year return
+        period should use the 334th worst loss (1:29.94) because it represents
+        the largest loss exceeded at a 0.0333333 prob.
+        In a 10k year set, you should choose the 333rd worst loss (30.03 return
+        period)
         """
 
         # Get the full EP curve
@@ -177,24 +189,30 @@ class YearLossTable(LossSeries):
 
         # Replace invalid return periods with NaN
         return_periods = np.array(return_periods).astype(float)
-        return_periods[return_periods < 1.0] = np.nan
+        is_invalid = return_periods < 1.0
+        return_periods[is_invalid] = np.nan
+        exprobs = np.array(1.0 / return_periods)
+
+        if not is_interp:
+            exprobs = np.ceil(exprobs * self.n_yrs) / self.n_yrs
 
         # Interpolate between the return periods
-        losses = np.interp(1 / return_periods,
+        losses = np.interp(exprobs,
                            ep_curve['ExProb'],
                            ep_curve[self.col_loss],
                            left=max_loss, right=0.0)
 
         return losses
 
-    def to_ep_summary(self, return_periods, **kwargs):
+    def to_ep_summary(self, return_periods, is_interp=True, **kwargs):
         """Get loss at summary return periods and return a pandas Series
 
         :returns: [pands.Series] with index 'ReturnPeriod' and Losses at each
         of those return periods
         """
 
-        return pd.Series(self.loss_at_rp(return_periods, **kwargs),
+        return pd.Series(self.loss_at_rp(return_periods, is_interp=is_interp,
+                                         **kwargs),
                          index=pd.Index(return_periods, name='ReturnPeriod'),
                          name='Loss')
 

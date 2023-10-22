@@ -7,10 +7,13 @@ from cattbl.base_classes import LossSeries
 
 
 # List of valid index names for the year column in order of preference
-VALID_YEAR_COLNAMES_LC = ['year', 'period', 'yearidx',
-                     'periodidx', 'year_idx', 'period_idx',
-                     'yearnumber', 'periodnumber', 'yearno', 'periodno',
-                     'yearnum', 'periodnum', 'index', 'idx']
+VALID_YEAR_COLNAMES_LC = ['year', 'period',
+                          'yearidx', 'periodidx', 'year_idx', 'period_idx',
+                          'yearnumber', 'periodnumber',
+                          'yearno', 'periodno',
+                          'yearnum', 'periodnum',
+                          'index', 'idx',
+                          'modelyear']
 
 
 @pd.api.extensions.register_series_accessor("yl")

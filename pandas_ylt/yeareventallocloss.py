@@ -2,8 +2,8 @@
 """
 from collections.abc import Iterable
 import pandas as pd
-from cattbl.yearloss import VALID_YEAR_COLNAMES_LC
-from cattbl.base_classes import LossSeries
+from pandas_ylt.yearloss import VALID_YEAR_COLNAMES_LC
+from pandas_ylt.base_classes import LossSeries
 
 
 @pd.api.extensions.register_series_accessor("yeal")

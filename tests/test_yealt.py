@@ -4,7 +4,7 @@ import os
 import pandas as pd
 
 # Import for the decorator
-from cattbl.yeareventallocloss import YearEventAllocLossTable  # pylint: disable=unused-import
+from pandas_ylt.yeareventallocloss import YearEventAllocLossTable  # pylint: disable=unused-import
 
 
 IFILE_TEST_YELT = os.path.join(os.path.dirname(__file__),

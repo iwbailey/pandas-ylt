@@ -4,7 +4,7 @@ import unittest
 import pandas as pd
 import numpy as np
 
-from cattbl import yearloss as ylt
+from pandas_ylt import yearloss as ylt
 
 
 class TestYLT(unittest.TestCase):

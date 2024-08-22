@@ -3,8 +3,8 @@ import warnings
 import pandas as pd
 import numpy as np
 
-from cattbl.base_classes import LossSeries
-from cattbl.yearloss import VALID_YEAR_COLNAMES_LC
+from pandas_ylt.base_classes import LossSeries
+from pandas_ylt.yearloss import VALID_YEAR_COLNAMES_LC
 
 # Default column names
 DEFAULT_COLNAME_YEAR = 'Year'

@@ -3,8 +3,8 @@ import unittest
 import os
 import pandas as pd
 
-from cattbl import yeareventloss as yelt
-from cattbl.yearloss import YearLossTable  # Import for the decorator
+from pandas_ylt import yeareventloss as yelt
+from pandas_ylt.yearloss import YearLossTable  # Import for the decorator
 
 
 IFILE_TEST_YELT = os.path.join(os.path.dirname(__file__),

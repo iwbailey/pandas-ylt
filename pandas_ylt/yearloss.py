@@ -3,7 +3,7 @@
 import warnings
 import pandas as pd
 import numpy as np
-from cattbl.base_classes import LossSeries
+from pandas_ylt.base_classes import LossSeries
 
 
 # List of valid index names for the year column in order of preference

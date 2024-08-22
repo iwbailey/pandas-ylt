@@ -41,9 +41,13 @@ class YearEventLossTable(LossSeries):
     and remaining indices defining an event. The value of the series should
     represent the loss. There should be an attribute called 'n_yrs'
     """
-    def __init__(self, pandas_obj):
+    def __init__(self, pandas_obj, n_yrs=None):
         """Validate the series for use with accessor"""
+        if n_yrs is not None:
+            pandas_obj.attrs['n_yrs'] = n_yrs
+
         super().__init__(pandas_obj)
+
         self._validate(pandas_obj)
 
     @staticmethod
@@ -218,11 +222,15 @@ class YearEventLossTable(LossSeries):
 
         return sev_curve
 
-    def loss_at_rp(self, return_periods, **kwargs):
+    def loss_at_rp(self, return_periods, is_interp=True, **kwargs):
         """Interpolate the year loss table for losses at specific return periods
 
         :param return_periods: [numpy.array] An array of return periods, which
         should be ordered from largest to smallest. A list will also work.
+
+        :param is_interp: [bool] interpolate between return periods. If False,
+        the loss for the next highest exceedance probability is returned.
+        Default is True.
 
         :returns: [numpy.array] losses at the corresponding return periods.
 
@@ -241,8 +249,12 @@ class YearEventLossTable(LossSeries):
         # Remove invalid return periods
         return_periods = np.array(return_periods).astype(float)
         return_periods[return_periods <= 0.0] = np.nan
+        exprobs = np.array(1.0 / return_periods)
 
-        losses = np.interp(1 / return_periods,
+        if not is_interp:
+            exprobs = np.ceil(exprobs * self.n_yrs) / self.n_yrs
+
+        losses = np.interp(exprobs,
                            ef_curve['ExFreq'],
                            ef_curve[self.col_loss],
                            left=max_loss, right=0.0)
@@ -318,7 +330,7 @@ class YearEventLossTable(LossSeries):
         """Return a dataframe with multiple EP curves side by side"""
 
         if not is_aep and not is_oep and not is_eef:
-            raise Exception("Must specify one of is_aep, is_oep, is_eef")
+            raise ValueError("Must specify one of is_aep, is_oep, is_eef")
 
         combined = []
         keys = []
@@ -331,7 +343,7 @@ class YearEventLossTable(LossSeries):
             if 'colname_aep' in kwargs:
                 keys.append(kwargs.get('colname_aep'))
             else:
-                keys.append('YearLoss')
+                keys.append('LossAEP')
 
             combined.append(aep)
 
@@ -343,7 +355,7 @@ class YearEventLossTable(LossSeries):
             if 'colname_oep' in kwargs:
                 keys.append(kwargs.get('colname_oep'))
             else:
-                keys.append('MaxEventLoss')
+                keys.append('LossOEP')
 
             combined.append(oep)
 
@@ -354,7 +366,7 @@ class YearEventLossTable(LossSeries):
             if 'colname_eef' in kwargs:
                 keys.append(kwargs.get('colname_eef'))
             else:
-                keys.append('EventLoss')
+                keys.append('LossEEF')
 
             combined.append(eef)
 
@@ -367,7 +379,7 @@ class YearEventLossTable(LossSeries):
         """Create side-by-side EP summaries for subsets of the YELT indices."""
 
         if splitby is None:
-            raise Exception("Must specify what to split the summaries by.")
+            raise ValueError("Must specify what to split the summaries by.")
 
         # Loop through each value of the 'splitby' field
         ep_curves = []
@@ -465,8 +477,11 @@ def from_csv(ifile, n_yrs):
 @pd.api.extensions.register_dataframe_accessor("yel")
 class YearEventLossTables:
     """Year event loss tables sharing the same index"""
-    def __init__(self, pandas_obj):
+    def __init__(self, pandas_obj, n_yrs=None):
         """Validate the dataframe for use with accessor"""
+
+        if n_yrs is not None:
+            pandas_obj.attrs['n_yrs'] = n_yrs
 
         self._validate(pandas_obj)
         self._obj = pandas_obj

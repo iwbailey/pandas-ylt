@@ -5,7 +5,9 @@ import pandas as pd
 
 class LossSeries:
     """A loss series with number of years stored in attributes"""
-    def __init__(self, pandas_obj):
+    def __init__(self, pandas_obj, n_yrs=None):
+        if n_yrs is not None:
+            pandas_obj.attrs['n_yrs'] = n_yrs
         self._validate(pandas_obj)
         self._obj = pandas_obj
 

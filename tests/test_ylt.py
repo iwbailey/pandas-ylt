@@ -241,5 +241,26 @@ class TestYLT(unittest.TestCase):
         self.assertTrue(all([np.array(retpers)[np.isnan(losses)] < 1]))
 
 
+    def test_rp_loss_no_interp(self):
+        """Check return period interpolation"""
+        ylt_series = self.get_default_ylt()
+
+        # Check the max loss is at the max return period
+        self.assertEqual(ylt_series.yl.loss_at_rp(self.n_years, is_interp=False),
+                         ylt_series.max())
+
+        # Check we can do multiple return periods including outside of range
+        retpers = range(12)
+        losses = ylt_series.yl.loss_at_rp(retpers, is_interp=False)
+
+        # Check same number of values returned
+        self.assertEqual(len(losses), len(retpers))
+
+        # Check no losses greater than the maximum
+        self.assertEqual(np.nanmax(losses), ylt_series.max())
+
+        # Check only the return periods less than 1 get a nan loss
+        self.assertTrue(all([np.array(retpers)[np.isnan(losses)] < 1]))
+
 if __name__ == '__main__':
     unittest.main()

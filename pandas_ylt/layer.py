@@ -4,7 +4,7 @@ import numpy as np
 
 class Layer:
     """A policy layer"""
-    def __init__(self, limit: float =None, xs: float =0.0, share:float=1.0, 
+    def __init__(self, limit: float =None, xs: float =0.0, share:float=1.0,
                  agg_limit: float=None, agg_xs:float=0.0, reinst_rate=0.0):
         """Define the layer properties"""
 
@@ -26,13 +26,25 @@ class Layer:
     @staticmethod
     def _validate(obj):
         # Validation
-        assert obj._limit is None or obj._limit > 0.0, \
+        assert obj.limit is None or obj.limit > 0.0, \
             "The limit must be greater than zero"
 
         if (not obj.is_const_reinst_rate and
-             len(obj._reinst_rates) != int(np.ceil(obj.n_avail_reinst))):
-            raise(ValueError("{} costs specified for {} reinstatements".format(
-                len(obj._reinst_rates), obj.n_avail_reinst)))
+             len(obj.reinst_rates) != int(np.ceil(obj.n_avail_reinst))):
+            msg = (
+                f"{obj.reinst_rates} costs specified for {obj.n_avail_reinst}"
+                + " reinstatements")
+            raise ValueError(msg)
+
+    @property
+    def limit(self):
+        """Get the layer limit"""
+        return self._limit
+
+    @property
+    def reinst_rates(self):
+        """Get the reinstatement rate on line"""
+        return self._reinst_rates
 
     @property
     def is_const_reinst_rate(self) -> bool:
@@ -42,21 +54,21 @@ class Layer:
     @property
     def max_reinstated_limit(self) -> float:
         """The maximum amount of limit that can be reinstated in the term"""
-        
+
         if self._limit is None:
             raise ValueError("Cannot define reinstatements without a limit")
 
         if self._agg_limit is None:
             return np.inf
-        
+
         return max(self._agg_limit - self._limit, 0.0)
 
     @property
     def n_avail_reinst(self) -> float:
         """The number of reinstatements derived from agg and layer limit"""            
-        
+
         return self.max_reinstated_limit / self._limit
-    
+
     def reinst_cost(self, agg_loss):
         """Calculate the reinstatement cost for a given annual loss"""
 
@@ -64,11 +76,11 @@ class Layer:
 
         if self.is_const_reinst_rate:
             return reinstated_limit * self._reinst_rates
-        
+
         total_reinst = 0.0
         for i, c in enumerate(self._reinst_rates):
             lower = i * self._limit
-            amount_reinstated = min(max(reinstated_limit - lower, 0.0), 
+            amount_reinstated = min(max(reinstated_limit - lower, 0.0),
                                     self._limit)
             total_reinst += amount_reinstated * c
 

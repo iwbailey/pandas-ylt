@@ -18,11 +18,14 @@ class Layer:
     ):
         """Define the layer properties"""
 
-        if limit is None and agg_limit is not None:
-            limit = agg_limit
+        if limit is None:
+            limit = np.inf
 
-        if limit is not None and agg_limit is not None:
-            limit = min(limit, agg_limit)
+        if agg_limit is None:
+            agg_limit = np.inf
+
+        if limit > agg_limit:
+            limit = agg_limit
 
         self._limit = limit
         self._xs = xs
@@ -36,7 +39,7 @@ class Layer:
     @staticmethod
     def _validate(obj):
         """Validate parameters"""
-        if obj.limit is None or obj.limit <= 0.0:
+        if obj.limit <= 0.0:
             raise ValueError("The limit must be greater than zero")
 
     @property
@@ -53,19 +56,10 @@ class Layer:
     def max_reinstated_limit(self) -> float:
         """The maximum amount of limit that can be reinstated in the term"""
 
-        if self._limit is None:
-            raise ValueError("Cannot define reinstatements without a limit")
-
-        if self._agg_limit is None:
+        if self._agg_limit == np.inf:
             return np.inf
 
         return max(self._agg_limit - self._limit, 0.0)
-
-    @property
-    def n_avail_reinst(self) -> float:
-        """The number of reinstatements derived from agg and layer limit"""
-
-        return self.max_reinstated_limit / self._limit
 
     def reinst_cost(self, agg_loss):
         """Calculate the reinstatement cost for a given annual loss"""

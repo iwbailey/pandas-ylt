@@ -1,4 +1,5 @@
 """Class to define a generic policy layer"""
+#pylint: disable=too-many-arguments
 
 import numpy as np
 
@@ -13,7 +14,7 @@ class Layer:
         share: float = 1.0,
         agg_limit: float = None,
         agg_xs: float = 0.0,
-        reinst_rate=0.0,
+        reinst_rate: float = 0.0,
     ):
         """Define the layer properties"""
 
@@ -28,25 +29,15 @@ class Layer:
         self._share = share
         self._agg_limit = agg_limit
         self._agg_xs = agg_xs
-        self._reinst_rates = reinst_rate
+        self._reinst_rate = reinst_rate
 
         self._validate(self)
 
     @staticmethod
     def _validate(obj):
-        # Validation
-        assert (
-            obj.limit is None or obj.limit > 0.0
-        ), "The limit must be greater than zero"
-
-        if not obj.is_const_reinst_rate and len(obj.reinst_rates) != int(
-            np.ceil(obj.n_avail_reinst)
-        ):
-            msg = (
-                f"{obj.reinst_rates} costs specified for {obj.n_avail_reinst}"
-                + " reinstatements"
-            )
-            raise ValueError(msg)
+        """Validate parameters"""
+        if obj.limit is None or obj.limit <= 0.0:
+            raise ValueError("The limit must be greater than zero")
 
     @property
     def limit(self):
@@ -54,14 +45,9 @@ class Layer:
         return self._limit
 
     @property
-    def reinst_rates(self):
+    def reinst_rate(self):
         """Get the reinstatement rate on line"""
-        return self._reinst_rates
-
-    @property
-    def is_const_reinst_rate(self) -> bool:
-        """Returns True if all reinstatements cost the same"""
-        return isinstance(self._reinst_rates, (int, float, complex))
+        return self._reinst_rate
 
     @property
     def max_reinstated_limit(self) -> float:
@@ -84,19 +70,10 @@ class Layer:
     def reinst_cost(self, agg_loss):
         """Calculate the reinstatement cost for a given annual loss"""
 
-        reinstated_limit = min(max(agg_loss - self._agg_xs, 0.0), 
+        reinstated_limit = min(max(agg_loss - self._agg_xs, 0.0),
                                self.max_reinstated_limit)
 
-        if self.is_const_reinst_rate:
-            return reinstated_limit * self._reinst_rates
-
-        total_reinst = 0.0
-        for i, c in enumerate(self._reinst_rates):
-            lower = i * self._limit
-            amount_reinstated = min(max(reinstated_limit - lower, 0.0), self._limit)
-            total_reinst += amount_reinstated * c
-
-        return total_reinst
+        return reinstated_limit * self._reinst_rate
 
 
 class MultiLayer:
@@ -108,11 +85,11 @@ class MultiLayer:
     @classmethod
     def from_variable_reinst_lyr_params(
         cls,
-        limit: float = None,
+        limit: float,
+        reinst_rates: list[float],
         xs: float = 0.0,
         share: float = 1.0,
         agg_xs: float = 0.0,
-        reinst_rates: list[float] | None = None,
     ):
         """Initialise a multilayer to represent a single layer with variable
         reinstatement costs"""
@@ -137,18 +114,14 @@ class MultiLayer:
         )
 
         return cls(layers)
-    
+
     @property
     def layers(self):
         """Return the list of layers"""
         return self._layers
-    
+
 
     def reinst_cost(self, agg_loss):
         """Calculate the reinstatement cost for a given annual loss"""
 
-        total_reinst = 0.0
-        for lyr in self.layers:
-            total_reinst += lyr.reinst_cost(agg_loss)
-
-        return total_reinst
+        return sum((lyr.reinst_cost(agg_loss) for lyr in self.layers))

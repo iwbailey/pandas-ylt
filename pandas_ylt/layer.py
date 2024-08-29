@@ -48,13 +48,18 @@ class Layer:
         return self._limit
 
     @property
+    def notional_limit(self):
+        """The share of the limit"""
+        return self._limit * self._share
+
+    @property
     def reinst_rate(self):
         """Get the reinstatement rate on line"""
         return self._reinst_rate
 
     @property
     def max_reinstated_limit(self) -> float:
-        """The maximum amount of limit that can be reinstated in the term"""
+        """The maximum amount of full limit that can be reinstated in the term"""
 
         if self._agg_limit == np.inf:
             return np.inf
@@ -67,11 +72,24 @@ class Layer:
         reinstated_limit = min(max(agg_loss - self._agg_xs, 0.0),
                                self.max_reinstated_limit)
 
-        return reinstated_limit * self._reinst_rate
+        return reinstated_limit * self._reinst_rate * self._share
+
+    def loss(self, event_loss, prior_agg_loss=0.0):
+        """Return the event loss after applying layer terms """
+
+        loss = np.clip(event_loss - self._xs, a_min=0.0, a_max=self._limit)
+
+        updated_agg_xs = max(self._agg_xs - prior_agg_loss, 0.0)
+        remaining_limit = max(self._agg_limit -
+                              max(prior_agg_loss - self._agg_xs, 0.0), 0.0)
+
+        loss = np.clip(loss - updated_agg_xs, a_min=0.0, a_max=remaining_limit)
+
+        return loss * self._share
 
 
 class MultiLayer:
-    """Class for a series of layers"""
+    """Class for a series of layers that acts as a single layer"""
 
     def __init__(self, layers: list[float] | None = None):
         self._layers = layers
@@ -119,3 +137,8 @@ class MultiLayer:
         """Calculate the reinstatement cost for a given annual loss"""
 
         return sum((lyr.reinst_cost(agg_loss) for lyr in self.layers))
+
+    def loss(self, event_loss, prior_agg_loss=0.0):
+        """Return the event loss after applying layer terms """
+
+        return sum((lyr.loss(event_loss, prior_agg_loss) for lyr in self.layers))

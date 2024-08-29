@@ -24,8 +24,7 @@ class Layer:
         if agg_limit is None:
             agg_limit = np.inf
 
-        if limit > agg_limit:
-            limit = agg_limit
+        limit = min(limit, agg_limit)
 
         self._limit = limit
         self._xs = xs

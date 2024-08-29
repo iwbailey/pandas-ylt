@@ -1,6 +1,6 @@
 """Class to define a generic policy layer"""
 #pylint: disable=too-many-arguments
-
+from typing import List
 import numpy as np
 
 
@@ -90,14 +90,14 @@ class Layer:
 class MultiLayer:
     """Class for a series of layers that acts as a single layer"""
 
-    def __init__(self, layers: list[float] | None = None):
+    def __init__(self, layers: List[float] | None = None):
         self._layers = layers
 
     @classmethod
     def from_variable_reinst_lyr_params(
         cls,
         limit: float,
-        reinst_rates: list[float],
+        reinst_rates: List[float],
         xs: float = 0.0,
         share: float = 1.0,
         agg_xs: float = 0.0,

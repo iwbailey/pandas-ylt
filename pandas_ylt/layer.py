@@ -85,6 +85,23 @@ class Layer:
         loss = np.clip(loss - updated_agg_xs, a_min=0.0, a_max=remaining_limit)
 
         return loss * self._share
+    
+    def yelt_loss(self, yelt_in):
+        """Get the YELT for losses to the layer"""
+
+        # Apply occurrence conditions
+        occ_loss = yelt_in.apply_layer(limit=self.limit, xs=self._xs)
+
+        # Calclate cumulative loss in year and apply agg conditions
+        agg_loss = occ_loss.to_aggloss_in_year()
+        agg_loss = np.clip(agg_loss - self._agg_xs, a_min=0.0, a_max=self._agg_limit)
+        agg_loss = agg_loss.loc[agg_loss != 0.0]
+
+        # Convert back into the occurrence loss
+        lyr_loss = agg_loss.groupby('Year').diff()
+        lyr_loss = lyr_loss.fillna(agg_loss)
+
+        return lyr_loss
 
 
 class MultiLayer:

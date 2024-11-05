@@ -90,7 +90,7 @@ class Layer:
         """Get the YELT for losses to the layer"""
 
         # Apply occurrence conditions
-        occ_loss = yelt_in.apply_layer(limit=self.limit, xs=self._xs)
+        occ_loss = yelt_in.yel.apply_layer(limit=self.limit, xs=self._xs)
 
         # Calclate cumulative loss in year and apply agg conditions
         agg_loss = occ_loss.to_aggloss_in_year()
@@ -100,6 +100,7 @@ class Layer:
         # Convert back into the occurrence loss
         lyr_loss = agg_loss.groupby('Year').diff()
         lyr_loss = lyr_loss.fillna(agg_loss)
+        lyr_loss.attrs['n_yrs'] = yelt_in.yel.n_yrs
 
         return lyr_loss
 

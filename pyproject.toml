@@ -26,4 +26,4 @@ classifiers = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/iwbailey/cattbl"
+"Homepage" = "https://github.com/iwbailey/pandas-ylt"

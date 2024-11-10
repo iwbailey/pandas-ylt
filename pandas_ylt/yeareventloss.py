@@ -278,7 +278,7 @@ class YearEventLossTable(LossSeries):
 
         if is_franchise:
             layer_losses += xs
- 
+
         return YearEventLossTable(layer_losses, self.n_yrs)
 
     def to_ep_summary(self, return_periods, is_occurrence=False, **kwargs):
@@ -357,28 +357,28 @@ class YearEventLossTable(LossSeries):
 
         return combined
 
-    def to_subset_ep_summaries(self, return_periods, splitby=None, **kwargs):
+    def to_subset_ep_summaries(self, return_periods, split_by=None, **kwargs):
         """Create side-by-side EP summaries for subsets of the YELT indices."""
 
-        if splitby is None:
+        if split_by is None:
             raise ValueError("Must specify what to split the summaries by.")
 
         # Loop through each value of the 'splitby' field
         ep_curves = []
         keys = []
-        for split_id in self._obj.index.get_level_values(splitby).unique():
+        for split_id in self._obj.index.get_level_values(split_by).unique():
             # Call this function on the subset of the YELT
-            yelt_sub = self._obj.xs(split_id, level=splitby)
+            yelt_sub = self._obj.xs(split_id, level=split_by)
             ep_curves.append(yelt_sub.yel.to_ep_summaries(return_periods,
                                                           **kwargs))
             keys.append(split_id)
 
-        # Make sure the splitby is a list
-        if isinstance(splitby, str):
-            splitby = [splitby]
+        # Make sure the split_by is a list
+        if isinstance(split_by, str):
+            split_by = [split_by]
 
         return (pd.concat(ep_curves, keys=keys, axis=1,
-                          names=splitby)
+                          names=split_by)
                 .swaplevel(0, -1, axis=1)
                 )
 
@@ -507,7 +507,7 @@ class YearEventLossTables:
     def to_ylt(self, is_occurrence=False):
         """Convert to a YLT
 
-        If is_occurrence return the max loss in a year. Otherwise return the
+        If is_occurrence return the max loss in a year. Otherwise, return the
         summed loss in a year.
         """
 

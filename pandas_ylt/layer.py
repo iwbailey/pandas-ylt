@@ -4,6 +4,7 @@ from typing import List
 import numpy as np
 
 
+# pylint: disable=too-many-arguments
 class Layer:
     """A policy layer"""
 
@@ -35,6 +36,7 @@ class Layer:
 
         self._validate(self)
 
+
     @staticmethod
     def _validate(obj):
         """Validate parameters"""
@@ -53,7 +55,7 @@ class Layer:
 
     @property
     def reinst_rate(self):
-        """Get the reinstatement rate on line"""
+        """Get the reinstatement rate-on-line"""
         return self._reinst_rate
 
     @property
@@ -85,14 +87,14 @@ class Layer:
         loss = np.clip(loss - updated_agg_xs, a_min=0.0, a_max=remaining_limit)
 
         return loss * self._share
-    
+
     def yelt_loss(self, yelt_in):
         """Get the YELT for losses to the layer"""
 
         # Apply occurrence conditions
         occ_loss = yelt_in.yel.apply_layer(limit=self.limit, xs=self._xs)
 
-        # Calclate cumulative loss in year and apply agg conditions
+        # Calculate cumulative loss in year and apply agg conditions
         agg_loss = occ_loss.to_aggloss_in_year()
         agg_loss = np.clip(agg_loss - self._agg_xs, a_min=0.0, a_max=self._agg_limit)
         agg_loss = agg_loss.loc[agg_loss != 0.0]
@@ -103,43 +105,51 @@ class Layer:
         lyr_loss.attrs['n_yrs'] = yelt_in.yel.n_yrs
 
         return lyr_loss
+# pylint: enable=too-many-arguments
 
 
 class MultiLayer:
     """Class for a series of layers that acts as a single layer"""
 
-    def __init__(self, layers: List[float] | None = None):
+    def __init__(self, layers: List[Layer] | None = None):
         self._layers = layers
 
     @classmethod
     def from_variable_reinst_lyr_params(
-        cls,
-        limit: float,
-        reinst_rates: List[float],
-        xs: float = 0.0,
-        share: float = 1.0,
-        agg_xs: float = 0.0,
+            cls,
+            limit,
+            reinst_rates: List[float],
+            **kwargs
     ):
         """Initialise a multilayer to represent a single layer with variable
         reinstatement costs"""
 
         n_reinst = len(reinst_rates)
 
+        if 'agg_xs' not in kwargs:
+            agg_xs = 0
+        else:
+            agg_xs = kwargs['agg_xs']
+
+        other_layer_params = {k: v for k, v in kwargs.items()
+                              if k not in ('limit', 'agg_xs', 'agg_limit', 'reinst_rate')}
+
         layers = []
         for i in range(n_reinst):
             this_agg_xs = agg_xs + i * limit
             layers.append(
-                Layer(limit, xs, share,
+                Layer(limit,
                     agg_limit=limit*2,
                     agg_xs=this_agg_xs,
                     reinst_rate=reinst_rates[i],
+                      **other_layer_params
                 )
             )
 
         layers.append(
-            Layer(limit, xs, share, agg_limit=limit,
+            Layer(limit, agg_limit=limit,
                   agg_xs=agg_xs + n_reinst * limit,
-                  reinst_rate=0.0)
+                  reinst_rate=0.0, **other_layer_params)
         )
 
         return cls(layers)

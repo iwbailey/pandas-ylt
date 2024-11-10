@@ -111,7 +111,7 @@ class Layer:
 class MultiLayer:
     """Class for a series of layers that acts as a single layer"""
 
-    def __init__(self, layers: List[Layer] | None = None):
+    def __init__(self, layers: List[Layer]  = None):
         self._layers = layers
 
     @classmethod

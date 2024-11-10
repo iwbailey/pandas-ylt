@@ -1,38 +1,43 @@
 """Class to define a generic policy layer"""
-#pylint: disable=too-many-arguments
 from typing import List
 import numpy as np
 
 
-# pylint: disable=too-many-arguments
 class Layer:
     """A policy layer"""
 
     def __init__(
-        self,
-        limit: float = None,
-        xs: float = 0.0,
-        share: float = 1.0,
-        agg_limit: float = None,
-        agg_xs: float = 0.0,
-        reinst_rate: float = 0.0,
+            self,
+            limit: float = None,
+            xs: float = 0.0,
+            share: float = 1.0,
+            **kwargs
     ):
         """Define the layer properties"""
 
         if limit is None:
             limit = np.inf
 
-        if agg_limit is None:
-            agg_limit = np.inf
+        # Defaults
+        other_layer_params = {
+            'agg_limit': np.inf,
+            'agg_xs': 0.0,
+            'reinst_rate': 0.0
+        }
 
-        limit = min(limit, agg_limit)
+        # Override defaults with inputs
+        for k in other_layer_params:
+            if k in kwargs and kwargs[k] is not None:
+                other_layer_params[k] = kwargs[k]
+
+        limit = min(limit, other_layer_params['agg_limit'])
 
         self._limit = limit
         self._xs = xs
         self._share = share
-        self._agg_limit = agg_limit
-        self._agg_xs = agg_xs
-        self._reinst_rate = reinst_rate
+        self._agg_limit = other_layer_params['agg_limit']
+        self._agg_xs = other_layer_params['agg_xs']
+        self._reinst_rate = other_layer_params['reinst_rate']
 
         self._validate(self)
 

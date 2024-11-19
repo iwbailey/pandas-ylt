@@ -243,20 +243,3 @@ def from_cols(year, loss, n_yrs):
     _ = ylt.yl.is_valid
 
     return ylt
-
-
-def from_yelt(yelt):
-    """Convert from a year event loss table to year loss table
-    """
-    ylt = (yelt
-           .groupby('Year')
-           .sum()
-           .sort_index()
-           )
-
-    ylt.attrs['n_yrs'] = yelt.attrs['n_yrs']
-
-    # Validate
-    _ = ylt.yl.is_valid
-
-    return ylt

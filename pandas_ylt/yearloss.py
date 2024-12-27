@@ -1,19 +1,31 @@
 """Module for working with a year loss table
 """
+
 import warnings
 import pandas as pd
 import numpy as np
 from pandas_ylt.base_classes import LossSeries
+from pandas_ylt.lossexceedance import LossExceedanceCurve
 
 
 # List of valid index names for the year column in order of preference
-VALID_YEAR_COLNAMES_LC = ['year', 'period',
-                          'yearidx', 'periodidx', 'year_idx', 'period_idx',
-                          'yearnumber', 'periodnumber',
-                          'yearno', 'periodno',
-                          'yearnum', 'periodnum',
-                          'index', 'idx',
-                          'modelyear']
+VALID_YEAR_COLNAMES_LC = [
+    "year",
+    "period",
+    "yearidx",
+    "periodidx",
+    "year_idx",
+    "period_idx",
+    "yearnumber",
+    "periodnumber",
+    "yearno",
+    "periodno",
+    "yearnum",
+    "periodnum",
+    "index",
+    "idx",
+    "modelyear",
+]
 
 
 @pd.api.extensions.register_series_accessor("yl")
@@ -25,9 +37,10 @@ class YearLossTable(LossSeries):
 
     Years go from 1 to n_yrs. Missing years are assumed to have zero loss.
     """
+
     def __init__(self, pandas_obj, n_yrs=None):
         if n_yrs is not None:
-            pandas_obj.attrs['n_yrs'] = n_yrs
+            pandas_obj.attrs["n_yrs"] = n_yrs
 
         super().__init__(pandas_obj)
         self._validate(pandas_obj)
@@ -36,25 +49,43 @@ class YearLossTable(LossSeries):
         # Define the column names
         self.col_year = self._obj.index.name
         if self.col_year.lower() not in VALID_YEAR_COLNAMES_LC:
-            warnings.warn(f"Index col {self.col_year} is not from expected list " +
-                          f"{VALID_YEAR_COLNAMES_LC}")
-
-        self.col_loss = self._obj.name
-        if self.col_loss is None:
-            self.col_loss = 'Loss'
+            warnings.warn(
+                f"Index col {self.col_year} is not from expected list "
+                + f"{VALID_YEAR_COLNAMES_LC}"
+            )
 
     @staticmethod
     def _validate(obj):
         """Verify the name is Loss, index is Year, and attribute n_yrs"""
 
         # Check the years are within range 1, n_yrs
-        if obj.index.min() < 1 or obj.index.max() > obj.attrs['n_yrs']:
+        if obj.index.min() < 1:
+            raise AttributeError("Years less than 1 are present")
+
+        if "n_yrs" in obj.attrs and obj.index.max() > obj.attrs["n_yrs"]:
             raise AttributeError("Years in index are out of range 1,n_yrs")
 
-    @property
-    def std(self):
+    def std(self, *args, **kwargs):
         """Return the standard deviation of annual loss"""
-        return self.to_ylt_filled().std()
+        return self.to_ylt_filled().std(*args, **kwargs)
+
+    def summary_stats(self, std_dev_args=None):
+        """Get the AAL and std deviation in a dict"""
+
+        return {'AAL': self.aal, 'STD': self.std(**std_dev_args)}
+    
+    def to_summary_stats_series(self, std_dev_args=None):
+        """Get the AAL and std deviation in a pandas Series"""
+
+        if std_dev_args is None:
+            std_dev_args = {}
+
+        result = pd.Series(self.summary_stats(std_dev_args)
+                           ).rename(self.col_loss)
+
+        result.index.name = 'Metric'
+
+        return result
 
     @property
     def prob_of_a_loss(self):
@@ -66,17 +97,19 @@ class YearLossTable(LossSeries):
 
         CProb = Prob(X<=x) where X is the annual loss
         """
-        return (self._obj.rank(ascending=True, method='max', **kwargs)
-                .add(self.n_yrs - len(self._obj))
-                .divide(self.n_yrs)
-                .rename('CProb')
-                )
+        return (
+            self._obj.rank(ascending=True, method="max", **kwargs)
+            .add(self.n_yrs - len(self._obj))
+            .divide(self.n_yrs)
+            .rename("CProb")
+        )
 
     def to_ylt_filled(self, fill_value=0.0):
         """Get a YLT with all years in the index, missing years filled value"""
 
-        filled_ylt = self._obj.reindex(range(1, int(self.n_yrs) + 1),
-                                       fill_value=fill_value)
+        filled_ylt = self._obj.reindex(
+            range(1, int(self.n_yrs) + 1), fill_value=fill_value
+        )
 
         return filled_ylt
 
@@ -93,26 +126,24 @@ class YearLossTable(LossSeries):
         """
 
         # Get a YLT filled in with zero losses
-        with_zeros = (self.to_ylt_filled(fill_value=0.0)
-                      .rename(self.col_loss))
+        with_zeros = self.to_ylt_filled(fill_value=0.0).rename(self.col_loss)
 
         # Get loss vs cumulative prop
         ecdf = pd.concat([with_zeros, with_zeros.yl.cprob(**kwargs)], axis=1)
 
         # Sort with loss ascending
-        ecdf = ecdf.reset_index().sort_values([self.col_loss, 'CProb',
-                                               self.col_year])
+        ecdf = ecdf.reset_index().sort_values([self.col_loss, "CProb", self.col_year])
 
         if not keep_years:
             ecdf = ecdf.drop(self.col_year, axis=1).drop_duplicates()
 
         # Reset index
         ecdf = ecdf.reset_index(drop=True)
-        ecdf.index.name = 'Order'
+        ecdf.index.name = "Order"
 
         return ecdf
 
-    def exprob(self, method='max', **kwargs):
+    def exprob(self, method="max", **kwargs):
         """Calculate the empiric annual exceedance probability for each loss
 
         The exceedance prob is defined here as P(Loss >= x)
@@ -120,101 +151,72 @@ class YearLossTable(LossSeries):
         :returns: [pandas.Series] of probabilities with same index
         """
 
-        return (self._obj.rank(ascending=False, method=method, **kwargs)
-                .divide(self.n_yrs)
-                .rename('ExProb')
-                )
+        return (
+            self._obj.rank(ascending=False, method=method, **kwargs)
+            .divide(self.n_yrs)
+            .rename("ExProb")
+        )
 
-    def to_ep_curve(self, keep_years=False, **kwargs):
+    def loss_exprobs(self, losses):
+        """Get the exceedance probabilities for speocific loss levels"""
+
+        return np.array([(self._obj >= x).sum() / self.n_yrs for x in losses])
+
+    def to_loss_excurve(self, **kwargs):
+        """Get the full loss-exprob curve
+
+        :returns: [pandas_ylt.LossExceedanceCurve] 
+        """
+
+        # Get a YLT filled in with zero losses
+        with_zeros_sorted = self.to_ylt_filled(0.0).sort_values(ascending=False)
+
+        # Create the dataframe by combining loss with exprob
+        ep_curve = (
+            pd.concat([with_zeros_sorted, 
+                       with_zeros_sorted.yl.exprob(**kwargs)], axis=1)
+            .drop_duplicates()
+        )
+
+        return LossExceedanceCurve(ep_curve[self.col_loss].values, 
+                                   ep_curve['ExProb'].values,
+                                   self.n_yrs)
+
+    def to_ep_curve(self, **kwargs):
         """Get the full loss-exprob curve
 
         :returns: [pandas.DataFrame] with columns 'Loss', and 'ExProb', index is
         ordered loss from largest to smallest.
         """
 
-        # Get a YLT filled in with zero losses
-        with_zeros = (self._obj.copy()
-                      .rename(self.col_loss)
-                      .reindex(range(1, int(self.n_yrs) + 1), fill_value=0.0))
+        ep_curve = self.to_loss_excurve(**kwargs).frame
 
-        # Create the dataframe by combining loss with exprob
-        ep_curve = pd.concat([with_zeros, with_zeros.yl.exprob(**kwargs)],
-                             axis=1)
+        # Rename the index
+        ep_curve.index.name = "Order"
 
-        # Sort from largest to smallest loss
-        ep_curve = ep_curve.reset_index().sort_values(
-            by=[self.col_loss, 'ExProb', self.col_year],
-                ascending=(False, True, False))
-
-        if not keep_years:
-            ep_curve = ep_curve.drop(self.col_year, axis=1).drop_duplicates()
-
-        # Reset the index
-        ep_curve = ep_curve.reset_index(drop=True)
-        ep_curve.index.name = 'Order'
+        # Rename the columns
+        ep_curve = ep_curve.rename(columns={'loss': self.col_loss, 'exfreq': 'ExProb'})
 
         return ep_curve
 
-    def loss_at_rp(self, return_periods, is_interp=True, **kwargs):
-        """Interpolate the year loss table for losses at specific return periods
+    def loss_at_exprobs(self, exprobs, **kwargs):
+        """Get the largest loss(es) exceeded at specified exceedance prob(s)"""
 
-        :param return_periods: [numpy.array] should be ordered from largest to
-        smallest. A list will also work.
+        ep_curve = self.to_loss_excurve(**kwargs)
 
-        :param is_interp: [bool] the loss will be interpalated as a function of
-        exccedance probability (see below). Otherwise, the next highest
-        exceedance probability will be used. Default is True.
+        return ep_curve.loss_at_exceedance(exprobs)
 
-        :returns: [numpy.array] losses at the corresponding return periods
-
-        The interpolation is done on exceedance probability.
-        Values below the smallest exceedance probability get the max loss
-        Values above the largest exceedance probability get zero
-        Invalid exceedance return periods get NaN
-
-        If not interpolating, the curve would be considered as a stepwise
-        function. In this case you should go to the loss of the next highest
-        exceedance probabilty. e.g., for a 10k event set, a 1:30-year return
-        period should use the 334th worst loss (1:29.94) because it represents
-        the largest loss exceeded at a 0.0333333 prob.
-        In a 10k year set, you should choose the 333rd worst loss (30.03 return
-        period)
-        """
-
-        # Get the full EP curve
-        ep_curve = self.to_ep_curve(method='first', **kwargs)
-
-        # Get the max loss for the high return periods
-        max_loss = ep_curve[self.col_loss].iloc[0]
-
-        # Replace invalid return periods with NaN
-        return_periods = np.array(return_periods).astype(float)
-        is_invalid = return_periods < 1.0
-        return_periods[is_invalid] = np.nan
-        exprobs = np.array(1.0 / return_periods)
-
-        if not is_interp:
-            exprobs = np.ceil(exprobs * self.n_yrs) / self.n_yrs
-
-        # Interpolate between the return periods
-        losses = np.interp(exprobs,
-                           ep_curve['ExProb'],
-                           ep_curve[self.col_loss],
-                           left=max_loss, right=0.0)
-
-        return losses
-
-    def to_ep_summary(self, return_periods, is_interp=True, **kwargs):
+    def to_rp_summary(self, return_periods, **kwargs):
         """Get loss at summary return periods and return a pandas Series
 
         :returns: [pands.Series] with index 'ReturnPeriod' and Losses at each
         of those return periods
         """
 
-        return pd.Series(self.loss_at_rp(return_periods, is_interp=is_interp,
-                                         **kwargs),
-                         index=pd.Index(return_periods, name='ReturnPeriod'),
-                         name='Loss')
+        ep_curve = self.to_loss_excurve(**kwargs)
+
+        return ep_curve.rp_summary(return_periods)
+
 
 
 def from_cols(year, loss, n_yrs):
@@ -235,10 +237,10 @@ def from_cols(year, loss, n_yrs):
         'MaxLoss': [float] maximum event loss
     """
 
-    ylt = pd.Series(loss, name='Loss', index=pd.Index(year, name='Year'))
+    ylt = pd.Series(loss, name="Loss", index=pd.Index(year, name="Year"))
 
     # Store the number of years as meta-data
-    ylt.attrs['n_yrs'] = n_yrs
+    ylt.attrs["n_yrs"] = n_yrs
 
     _ = ylt.yl.is_valid
 

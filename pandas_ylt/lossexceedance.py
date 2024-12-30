@@ -18,17 +18,19 @@ class LossExceedanceCurve:
     def _validate(obj):
         """Check this is an exceedance curve"""
 
-        # TODO: Losses are all increasing
+        # Losses are all decreasing
+        if not obj['loss'].is_monotonic_decreasing:
+            raise AttributeError("losses should all be decreasing")
 
-        # TODO: rates are all decreasing
-        
-        # TODO: No duplicate losses
-    
+        # Rates are all increasing
+        if not obj['exfreq'].is_monotonic_increasing:
+            raise AttributeError("exceedance frequencies should all be increasing")
+
     @property
     def frame(self):
         """Return the underlying dataframe"""
         return self._obj
-    
+
     @property
     def loss(self):
         """Numpy array of the losses"""
@@ -48,7 +50,7 @@ class LossExceedanceCurve:
             raise AttributeError("Must have 'n_yrs' in the frame attrs")
 
         return self._obj.attrs['n_yrs']
-        
+
     @property
     def min_exfreq(self):
         """The minimum exceedance probability of a loss"""
@@ -61,13 +63,13 @@ class LossExceedanceCurve:
             return self.loss[is_exceeded.argmax()]
 
         return np.nan
-    
-    def loss_at_exceedance(self, exfreqs, **kwargs):
+
+    def loss_at_exceedance(self, exfreqs):
         """Get the largest loss(es) exceeded at specified exceedance prob(s)"""
 
         return np.array([self.max_loss_exceeded(x) for x in exfreqs])
 
-    def rp_summary(self, return_periods, **kwargs):
+    def rp_summary(self, return_periods):
         """Get loss at summary return periods and return a pandas Series
 
         :returns: [pands.Series] with index 'ReturnPeriod' and Losses at each
@@ -75,8 +77,7 @@ class LossExceedanceCurve:
         """
 
         return pd.Series(
-            self.loss_at_exceedance([1 / r for r in return_periods], **kwargs),
+            self.loss_at_exceedance([1 / r for r in return_periods]),
             index=pd.Index(return_periods, name="ReturnPeriod"),
             name="Loss",
         )
-

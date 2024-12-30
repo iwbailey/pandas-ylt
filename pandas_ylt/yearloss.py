@@ -73,7 +73,7 @@ class YearLossTable(LossSeries):
         """Get the AAL and std deviation in a dict"""
 
         return {'AAL': self.aal, 'STD': self.std(**std_dev_args)}
-    
+
     def to_summary_stats_series(self, std_dev_args=None):
         """Get the AAL and std deviation in a pandas Series"""
 
@@ -173,12 +173,12 @@ class YearLossTable(LossSeries):
 
         # Create the dataframe by combining loss with exprob
         ep_curve = (
-            pd.concat([with_zeros_sorted, 
+            pd.concat([with_zeros_sorted,
                        with_zeros_sorted.yl.exprob(**kwargs)], axis=1)
             .drop_duplicates()
         )
 
-        return LossExceedanceCurve(ep_curve[self.col_loss].values, 
+        return LossExceedanceCurve(ep_curve[self.col_loss].values,
                                    ep_curve['ExProb'].values,
                                    self.n_yrs)
 

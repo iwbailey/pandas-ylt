@@ -3,6 +3,7 @@ import unittest
 
 import pandas as pd
 import numpy as np
+from numpy.testing import assert_array_equal
 
 from pandas_ylt import yearloss as ylt
 
@@ -64,7 +65,7 @@ class TestYLT(unittest.TestCase):
         test_ylt = test_ylt.loc[test_ylt> 0]
 
         # Check we get the same standard deviation back
-        self.assertEqual(test_ref.std(), test_ylt.yl.std)
+        self.assertEqual(test_ref.std(), test_ylt.yl.std())
 
     def test_prob_of_a_loss_default(self):
         """Test we calculate the right prob of a loss"""
@@ -179,17 +180,16 @@ class TestYLT(unittest.TestCase):
         expected = pd.Series([5, 5, 5, 2, 2], index=[1, 2, 3, 4, 5]) / 8
         self.assertTrue(expected.equals(this_ylt.yl.exprob()))
 
-        # Expect the order to go losses descending, years descending
-        year_order = this_ylt.yl.to_ep_curve(keep_years=True)['Year'].values
-        expected_year_order = np.array([5, 4, 3, 2, 1, 8, 7, 6])
-        self.assertTrue(np.array_equal(expected_year_order, year_order))
+        # Ex curve should get rid of the duplicates
+        expected = pd.DataFrame({'Loss': [2., 1., 0.], 'ExProb': np.array([2, 5, 8]) / 8})
+        self.assertTrue(expected.equals(this_ylt.yl.to_ep_curve()))
 
-    def test_ep_curve(self, keep_years=False):
+    def test_ep_curve(self):
         """Check the EP curve calculation"""
         ylt_series = self.get_default_ylt()
 
         # Get the EP curve
-        loss_ep = ylt_series.yl.to_ep_curve(keep_years)
+        loss_ep = ylt_series.yl.to_ep_curve()
 
         # Check Exprob increases as Loss increases
         self.assertTrue((loss_ep['Loss'].is_monotonic_decreasing &
@@ -200,67 +200,22 @@ class TestYLT(unittest.TestCase):
         self.assertIsInstance(loss_ep.index, pd.RangeIndex,
                               msg="Expecting a range index for EP curve")
 
-    def test_ep_curve_with_years(self):
-        """Check with years that the other columns are not changed"""
-        self.test_ep_curve(False)
-        ylt_series = self.get_default_ylt()
-
-        loss_ep = ylt_series.yl.to_ep_curve(keep_years=False)
-        loss_ep_v2 = ylt_series.yl.to_ep_curve(keep_years=True)
-
-        self.assertTrue(loss_ep.reset_index(drop=True).equals(
-                (loss_ep_v2[loss_ep.columns]
-                 .drop_duplicates()
-                 .reset_index(drop=True)
-                 )
-        ))
-
-        # Check the year loss combinations are the same as input
-        self.assertTrue((loss_ep_v2.set_index('Year')['Loss']
-                         .subtract(ylt_series, fill_value=0.0) < 1e-8).all())
-
-    def test_rp_loss(self):
-        """Check return period interpolation"""
+    def test_loss_at_exprobs(self):
+        """Check getting the loss for specific exceedance probabilities"""
         ylt_series = self.get_default_ylt()
 
         # Check the max loss is at the max return period
-        self.assertEqual(ylt_series.yl.loss_at_rp(self.n_years),
+        self.assertEqual(ylt_series.yl.loss_at_exprobs([1 / self.n_years]),
                          ylt_series.max())
 
         # Check we can do multiple return periods including outside of range
-        retpers = range(12)
-        losses = ylt_series.yl.loss_at_rp(retpers)
+        exprobs = 1 / np.arange(1, 13, 1)
+        losses = ylt_series.yl.loss_at_exprobs(exprobs)
 
-        # Check same number of values returned
-        self.assertEqual(len(losses), len(retpers))
+        expected = np.array([0., 2.5, 5., 7.5, 10., 10., 10., 10., 10., 10., np.nan, np.nan])
 
-        # Check no losses greater than the maximum
-        self.assertEqual(np.nanmax(losses), ylt_series.max())
+        assert_array_equal(losses, expected)
 
-        # Check only the return periods less than 1 get a nan loss
-        self.assertTrue(all([np.array(retpers)[np.isnan(losses)] < 1]))
-
-
-    def test_rp_loss_no_interp(self):
-        """Check return period interpolation"""
-        ylt_series = self.get_default_ylt()
-
-        # Check the max loss is at the max return period
-        self.assertEqual(ylt_series.yl.loss_at_rp(self.n_years, is_interp=False),
-                         ylt_series.max())
-
-        # Check we can do multiple return periods including outside of range
-        retpers = range(12)
-        losses = ylt_series.yl.loss_at_rp(retpers, is_interp=False)
-
-        # Check same number of values returned
-        self.assertEqual(len(losses), len(retpers))
-
-        # Check no losses greater than the maximum
-        self.assertEqual(np.nanmax(losses), ylt_series.max())
-
-        # Check only the return periods less than 1 get a nan loss
-        self.assertTrue(all([np.array(retpers)[np.isnan(losses)] < 1]))
 
 if __name__ == '__main__':
     unittest.main()

@@ -57,38 +57,16 @@ class TestCreateYELT(unittest.TestCase):
         self.assertIsInstance(yelt.YearEventLossTable(yelt_as_series),
                               yelt.YearEventLossTable)
 
-    def test_from_df(self):
-        """Test creation from the from_df function"""
-
-        my_yelt = yelt.from_df(self.example_yelt, n_yrs=self.n_yrs)
-
-        self.assertEqual(my_yelt.yel.n_yrs, self.n_yrs)
-
     def test_invalid_key(self):
         """Check raise an error with duplicate keys"""
         with self.assertRaises(ValueError):
-            yelt.from_df(
-                    pd.DataFrame({'year': [4, 4],
+            idx = pd.Index({'year': [4, 4],
                                   'eventid': [3, 3],
-                                  'dayofyear': [200, 200],
-                                  'loss': [2.0, 3.0]}),
-                                  n_yrs=5,
-                                  colname_loss='loss')
+                                  'dayofyear': [200, 200]})
+            ds = pd.Series([2.0, 3.0], name='loss', index=idx)
+            ds.attrs['n_yrs'] = 5
 
-    def test_from_df_with_years(self):
-        """See if we can create using n_yrs as existing attribute"""
-        yelt_with_years = self.example_yelt.copy()
-        yelt_with_years.attrs['n_yrs'] = self.n_yrs
-        my_yelt = yelt.from_df(yelt_with_years)
-        self.assertEqual(my_yelt.yel.n_yrs, self.n_yrs)
-
-    def test_from_csv(self):
-        """Test we can create a YELT from the example file"""
-
-        my_yelt = yelt.from_csv(IFILE_TEST_YELT,
-                                n_yrs=TEST_YELT_N_YEARS)
-
-        self.assertEqual(my_yelt.yel.n_yrs, TEST_YELT_N_YEARS)
+            assert ds.yel.is_valid
 
 
 class TestYELTprops(unittest.TestCase):
@@ -97,8 +75,11 @@ class TestYELTprops(unittest.TestCase):
         """Initialise test variables"""
 
         # Read the YELT from file
-        self.test_yelt = yelt.from_csv(IFILE_TEST_YELT,
-                                       n_yrs=TEST_YELT_N_YEARS)
+        ds = pd.read_csv(IFILE_TEST_YELT)
+        ds = ds.set_index(['Year', 'EventID', 'DayOfYear'])['Loss']
+        ds.attrs['n_yrs'] = TEST_YELT_N_YEARS
+
+        self.test_yelt = ds
 
     def test_n_yrs(self):
         """Test the number of years is okay"""
@@ -127,8 +108,10 @@ class TestYELTmethods(unittest.TestCase):
         """Initialize test variables"""
 
         # Read the YELT from file
-        self.test_yelt = yelt.from_csv(IFILE_TEST_YELT,
-                                       n_yrs=TEST_YELT_N_YEARS)
+        ds = pd.read_csv(IFILE_TEST_YELT)
+        ds = ds.set_index(['Year', 'EventID', 'DayOfYear'])['Loss']
+        ds.attrs['n_yrs'] = TEST_YELT_N_YEARS
+        self.test_yelt = ds
 
     def test_to_ylt(self):
         """Test we can convert to a ylt"""
@@ -206,67 +189,23 @@ class TestYELTmethods(unittest.TestCase):
         """Test a layer is applied correctly"""
 
         # Create a yelt
-        this_yelt = yelt.from_df(pd.DataFrame({
-            'year': [1, 1, 1, 1],
-            'EventID': range(4),
-            'dayofyear': range(1, 5),
-            'loss':[5, 7, 8, 10]}),
-                n_yrs=1, colname_loss='loss')
+        this_yelt = pd.Series([5, 7, 8, 10], name='loss',
+                              index=pd.MultiIndex.from_tuples([
+                                  (1, 0, 1), (1, 1, 2), (1, 2, 3), (1, 3, 4)],
+                                      names=('year', 'EventID', 'dayofyear')))
+        this_yelt.attrs['n_yrs'] = 5
 
         # Test an upper limit
         self.assertTrue((this_yelt.yel.apply_layer(limit=5) == 5.0).all())
 
         # Test a lower threshold
-        tmp = this_yelt.yel.apply_layer(attach=8)
+        tmp = this_yelt.yel.apply_layer(xs=8)
 
         # Check we only get one non-zero value back
         self.assertEqual((tmp > 0.0).sum(), 1)
 
         # Check the loss of 10 is changed to 2
         self.assertEqual(tmp.xs(3, level='EventID').iloc[0], 2.0)
-
-        # Check the occurrence cuts of other events
-        self.assertEqual((this_yelt.yel.apply_layer(n_loss=1) > 0).sum(), 1)
-
-        # Check all three combined
-        tmp = this_yelt.yel.apply_layer(limit=2, attach=6, n_loss=2)
-
-        # Should get only two losses
-        self.assertEqual((tmp > 0).sum(), 2)
-
-        # First loss should be 1
-        self.assertEqual(tmp.xs(1, level='EventID').iloc[0], 1.0)
-
-        # Second loss should be 2
-        self.assertEqual(tmp.xs(2, level='EventID').iloc[0], 2.0)
-
-    def test_layer_aal(self):
-        """Test we can calculate the loss in range"""
-
-        # Test calculating the loss in the full range is the same as AAL
-        self.assertEqual(self.test_yelt.yel.layer_aal(),
-                         self.test_yelt.yel.aal)
-
-        # Test an upper layer reduces the loss
-        loss1 = 2.0 * self.test_yelt.min()
-        loss2 = 0.9 * self.test_yelt.max() - loss1
-        aal_upper = self.test_yelt.yel.layer_aal(limit=loss2)
-        self.assertLess(aal_upper, self.test_yelt.yel.aal)
-
-        # Test a lower layer reduces the loss
-        aal_lower = self.test_yelt.yel.layer_aal(attach=loss1)
-        self.assertLess(aal_lower, self.test_yelt.yel.aal)
-
-        # Test both lower and upper is lowest of all
-        aal_mid = self.test_yelt.yel.layer_aal(attach=loss1, limit=loss2)
-        self.assertLess(aal_mid, aal_upper)
-        self.assertLess(aal_mid, aal_lower)
-
-        # Test reducing the number of losses reduces the aal
-        aal_mid_1loss = self.test_yelt.yel.layer_aal(attach=loss1, limit=loss2,
-                                                      n_loss=1)
-
-        self.assertLess(aal_mid_1loss, aal_mid)
 
     def test_severity_curve(self):
         """Test we can calculate a severity curve"""
@@ -284,11 +223,11 @@ class TestYELTmethods(unittest.TestCase):
                          sevcurve['CProb'].is_monotonic_increasing),
                         msg="Expecting loss to increase as CProb increases")
 
-    def test_ef_curve(self, keep_index=False):
+    def test_ef_curve(self):
         """Check the EF curve calculation"""
 
         # Get the EP curve
-        loss_ef = self.test_yelt.yel.to_ef_curve(keep_index)
+        loss_ef = self.test_yelt.yel.to_ef_curve()
 
         # Check Exprob increases as Loss increases
         self.assertTrue((loss_ef['Loss'].is_monotonic_decreasing &
@@ -317,11 +256,11 @@ class TestYELTmethods(unittest.TestCase):
 
     def test_negative_losses(self):
         """Test negative losses don't lead to an error"""
-        this_yelt = yelt.from_df(pd.DataFrame({
-            'Year': [1, 2, 2, 4, 5],
-            'EventID': [1, 2, 3, 4, 5],
-            'Loss': [-1, 0, 0, 2, 3],
-        }), n_yrs=6)
+        this_yelt = pd.Series([-1, 0, 0, 2, 3],
+                              index=pd.MultiIndex.from_tuples([
+                                  (1, 1), (2, 2), (2, 3), (4, 4), (5, 5)],
+                                      names=('Year', 'EventID')))
+        this_yelt.attrs['n_yrs'] = 6
 
         self.assertAlmostEqual(this_yelt.yel.freq0, 2 / 6)
 

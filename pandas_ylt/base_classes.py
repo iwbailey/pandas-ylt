@@ -71,5 +71,3 @@ class LossSeries:
         loss_series.attrs['n_yrs'] = n_yrs
 
         return loss_series
-
-

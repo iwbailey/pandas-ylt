@@ -171,7 +171,7 @@ class YearEventLossTable(LossSeries):
         if is_franchise:
             layer_losses += xs
 
-        return YearEventLossTable(layer_losses, self.n_yrs)
+        return layer_losses
 
     def to_loss_excurve(self, **kwargs):
         """Get the full loss exceedance frequency curve"""

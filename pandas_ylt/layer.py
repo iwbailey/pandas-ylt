@@ -100,7 +100,7 @@ class Layer:
         occ_loss = yelt_in.yel.apply_layer(limit=self.limit, xs=self._xs)
 
         # Calculate cumulative loss in year and apply agg conditions
-        agg_loss = occ_loss.to_aggloss_in_year()
+        agg_loss = occ_loss.yel.to_aggloss_in_year()
         agg_loss = np.clip(agg_loss - self._agg_xs, a_min=0.0, a_max=self._agg_limit)
         agg_loss = agg_loss.loc[agg_loss != 0.0]
 
@@ -110,7 +110,6 @@ class Layer:
         lyr_loss.attrs['n_yrs'] = yelt_in.yel.n_yrs
 
         return lyr_loss
-# pylint: enable=too-many-arguments
 
 
 class MultiLayer:

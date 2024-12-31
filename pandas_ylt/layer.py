@@ -41,7 +41,6 @@ class Layer:
 
         self._validate(self)
 
-
     @staticmethod
     def _validate(obj):
         """Validate parameters"""
@@ -57,6 +56,11 @@ class Layer:
     def notional_limit(self):
         """The share of the limit"""
         return self._limit * self._share
+
+    @property
+    def agg_limit(self):
+        """The aggregate limit for the layer"""
+        return self._agg_limit
 
     @property
     def reinst_rate(self):
@@ -93,21 +97,29 @@ class Layer:
 
         return loss * self._share
 
-    def yelt_loss(self, yelt_in):
+    def yelt_loss(self, yelt_in, net_reinst=False):
         """Get the YELT for losses to the layer"""
 
         # Apply occurrence conditions
         occ_loss = yelt_in.yel.apply_layer(limit=self.limit, xs=self._xs)
 
         # Calculate cumulative loss in year and apply agg conditions
-        agg_loss = occ_loss.yel.to_aggloss_in_year()
-        agg_loss = np.clip(agg_loss - self._agg_xs, a_min=0.0, a_max=self._agg_limit)
-        agg_loss = agg_loss.loc[agg_loss != 0.0]
+        cumul_loss = occ_loss.yel.to_aggloss_in_year()
+        cumul_loss = np.clip(cumul_loss - self._agg_xs, a_min=0.0, a_max=self.agg_limit)
+        cumul_loss = cumul_loss.loc[cumul_loss != 0.0]
 
         # Convert back into the occurrence loss
-        lyr_loss = agg_loss.groupby('Year').diff()
-        lyr_loss = lyr_loss.fillna(agg_loss)
+        lyr_loss = cumul_loss.groupby('Year').diff()
+        lyr_loss = lyr_loss.fillna(cumul_loss)
         lyr_loss.attrs['n_yrs'] = yelt_in.yel.n_yrs
+
+        if net_reinst:
+            reinst_closs = np.minimum(cumul_loss, self.max_reinstated_limit)
+            reinst_lyr_loss = reinst_closs.groupby('Year').diff().fillna(reinst_closs)
+            reinst_costs = reinst_lyr_loss * self.reinst_rate
+
+            # Reinstatements offset the loss of the layer, so subtract
+            lyr_loss = lyr_loss - reinst_costs
 
         return lyr_loss
 

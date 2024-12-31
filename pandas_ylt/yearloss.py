@@ -72,6 +72,9 @@ class YearLossTable(LossSeries):
     def summary_stats(self, std_dev_args=None):
         """Get the AAL and std deviation in a dict"""
 
+        if std_dev_args is None:
+            std_dev_args = {}
+
         return {'AAL': self.aal, 'STD': self.std(**std_dev_args)}
 
     def to_summary_stats_series(self, std_dev_args=None):

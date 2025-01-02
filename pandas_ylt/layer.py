@@ -22,7 +22,8 @@ class Layer:
         other_layer_params = {
             'agg_limit': np.inf,
             'agg_xs': 0.0,
-            'reinst_rate': 0.0
+            'reinst_rate': 0.0,
+            'premium': 0.0,
         }
 
         # Override defaults with inputs
@@ -38,6 +39,7 @@ class Layer:
         self._agg_limit = other_layer_params['agg_limit']
         self._agg_xs = other_layer_params['agg_xs']
         self._reinst_rate = other_layer_params['reinst_rate']
+        self._premium = other_layer_params['premium']
 
         self._validate(self)
 
@@ -61,6 +63,11 @@ class Layer:
     def agg_limit(self):
         """The aggregate limit for the layer"""
         return self._agg_limit
+
+    @property
+    def premium(self):
+        """Premium for the layer"""
+        return self._premium
 
     @property
     def reinst_rate(self):

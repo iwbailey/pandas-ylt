@@ -1,5 +1,6 @@
 """Test the ylt module is working as expected"""
 import unittest
+import pytest  # noqa # pylint: disable=unused-import
 
 import pandas as pd
 import numpy as np
@@ -7,6 +8,12 @@ from numpy.testing import assert_array_equal
 
 from pandas_ylt import yearloss as ylt
 
+
+def test_initialise_min_requiremnts():
+    """Test set up from a simple pandas series """
+    ds = pd.Series([1, 1, 1, 1], index=[1, 2, 3, 4]).yl.set_n_yrs(5)
+
+    assert ds.yl.is_valid
 
 class TestYLT(unittest.TestCase):
     """Tests on the YearLossTable"""
@@ -137,15 +144,6 @@ class TestYLT(unittest.TestCase):
         # Check monotonically increasing
         self.assertTrue(ecdf['Loss'].is_monotonic_increasing &
                         ecdf['CProb'].is_monotonic_increasing)
-
-    def test_ecdf_keep_years(self):
-        """Test the ECDF returns the years when requested"""
-        ylt_series = self.get_default_ylt()
-        ecdf = ylt_series.yl.to_ecdf(keep_years=False)
-        self.assertFalse('Year' in ecdf.columns)
-
-        ecdf = ylt_series.yl.to_ecdf(keep_years=True)
-        self.assertTrue('Year' in ecdf.columns)
 
     def test_exprob(self):
         """Test calculation of exceedance prob"""

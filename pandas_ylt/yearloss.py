@@ -1,7 +1,6 @@
 """Module for working with a year loss table
 """
 
-import warnings
 import pandas as pd
 import numpy as np
 from pandas_ylt.base_classes import LossSeries
@@ -45,14 +44,6 @@ class YearLossTable(LossSeries):
         super().__init__(pandas_obj)
         self._validate(pandas_obj)
         self._obj = pandas_obj
-
-        # Define the column names
-        self.col_year = self._obj.index.name
-        if self.col_year.lower() not in VALID_YEAR_COLNAMES_LC:
-            warnings.warn(
-                f"Index col {self.col_year} is not from expected list "
-                + f"{VALID_YEAR_COLNAMES_LC}"
-            )
 
     @staticmethod
     def _validate(obj):
@@ -116,29 +107,25 @@ class YearLossTable(LossSeries):
 
         return filled_ylt
 
-    def to_ecdf(self, keep_years=False, **kwargs):
+    def to_ecdf(self, **kwargs):
         """Return the empirical cumulative loss distribution function
 
         :returns: [pandas.DataFrame] with columns 'Loss' and 'CProb' ordered by
         Loss, CProb and Year, respectively. The index is a range index named
         'Order'
 
-        If keep_years=True, then the 'Years' of the original YLT are retained.
-
         kwargs are passed to ylt.cprob
         """
 
         # Get a YLT filled in with zero losses
-        with_zeros = self.to_ylt_filled(fill_value=0.0).rename(self.col_loss)
+        with_zeros_sorted = self.to_ylt_filled(0.0).sort_values(ascending=True)
 
-        # Get loss vs cumulative prop
-        ecdf = pd.concat([with_zeros, with_zeros.yl.cprob(**kwargs)], axis=1)
-
-        # Sort with loss ascending
-        ecdf = ecdf.reset_index().sort_values([self.col_loss, "CProb", self.col_year])
-
-        if not keep_years:
-            ecdf = ecdf.drop(self.col_year, axis=1).drop_duplicates()
+        # Create the dataframe by combining loss with exprob
+        ecdf = (
+            pd.concat([with_zeros_sorted,
+                       with_zeros_sorted.yl.cprob(**kwargs)], axis=1)
+            .drop_duplicates()
+        )
 
         # Reset index
         ecdf = ecdf.reset_index(drop=True)

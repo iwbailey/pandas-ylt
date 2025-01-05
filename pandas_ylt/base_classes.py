@@ -1,5 +1,4 @@
 """Base class for all loss tables"""
-import warnings
 import pandas as pd
 
 
@@ -23,12 +22,6 @@ class LossSeries:
         # Check the series is numeric
         if not pd.api.types.is_numeric_dtype(obj):
             raise TypeError(f"Series should be numeric. It is {obj.dtype}")
-
-        # Check indices can be unique and sortable
-        if any((pd.api.types.is_float_dtype(c) for c in obj.index.levels)):
-            warnings.warn("Float indices found which might cause errors: ")
-            for this_level in obj.index_levels:
-                print(this_level.name, ":", this_level.dtype)
 
         # Check unique
         if not obj.index.is_unique:

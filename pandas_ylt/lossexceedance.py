@@ -67,7 +67,10 @@ class LossExceedanceCurve:
     def loss_at_exceedance(self, exfreqs):
         """Get the largest loss(es) exceeded at specified exceedance prob(s)"""
 
-        return np.array([self.max_loss_exceeded(x) for x in exfreqs])
+        try:
+            return np.array([self.max_loss_exceeded(x) for x in exfreqs])
+        except TypeError:
+            return self.max_loss_exceeded(exfreqs)
 
     def rp_summary(self, return_periods):
         """Get loss at summary return periods and return a pandas Series

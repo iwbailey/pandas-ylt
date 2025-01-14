@@ -152,8 +152,8 @@ class YearLossTable(LossSeries):
 
         def loss_exprob(x):
             """Get the exceedance prob for a specific loss value"""
-            return (self._obj >= x).sum() / self.n_yrs 
-        
+            return (self._obj >= x).sum() / self.n_yrs
+
         try:
             return np.array([loss_exprob(x) for x in losses])
         except TypeError:

@@ -11,7 +11,7 @@ def append_beta_params(elt, eps=1e-12, sd_lower=0.0):
     'MeanLoss', 'StdDev', 'MaxLoss'
 
     :param eps: (float) minimum value allowed for normalized mean and std dev.
-    If either are below this, the alpha and beta are returned as numpy.nan
+    If either are below this, the alpha and beta are returned as NaN.
 
     :param sd_lower: (float) apply a lower clip so normalized standard deviation
     is not allowed to be lower than this.
@@ -19,7 +19,7 @@ def append_beta_params(elt, eps=1e-12, sd_lower=0.0):
     :returns: dataframe with additional columns 'alpha' and 'beta'
 
     If the mean or standard deviation are less than eps, then the returned values are
-    numpy.nan
+    NaN
     """
 
     beta_mu = elt['MeanLoss'] / elt['MaxLoss']

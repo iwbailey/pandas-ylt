@@ -133,3 +133,4 @@ dmypy.json
 non-migrated_src
 tests/_data/example_allocated_loss.csv
 tests/_data/example_two_models_grossnet.csv
+tests/_data/example_pareto_poisson_yelt.csv

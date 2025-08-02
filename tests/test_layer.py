@@ -92,6 +92,9 @@ def test_reinst_cost(layer_params, agg_loss, expected):
 
         # Agg limit already used up
         ({'agg_limit': 2.0, 'agg_xs': 1.0, 'xs': 1.0}, 3.0, 3.0, 0.0),
+
+        # Agg limit and agg xs with no layer limit, single event uses all loss
+        ({'agg_limit': 2.0, 'agg_xs': 5.0}, 7.0, 0.0, 2.0),
     ],
 )
 def test_layer_loss(layer_params, event_loss, prior_agg_loss, expected):

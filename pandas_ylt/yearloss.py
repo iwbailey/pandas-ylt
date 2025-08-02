@@ -15,6 +15,7 @@ VALID_YEAR_COLNAMES_LC = [
     "periodidx",
     "year_idx",
     "period_idx",
+    "periodid",
     "yearnumber",
     "periodnumber",
     "yearno",

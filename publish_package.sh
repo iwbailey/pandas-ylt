@@ -6,4 +6,5 @@ python -m build
 
 pip install --upgrade twine
 
-python -m twine upload dist/*
+# Note that the API must be stored in your $HOME/.pypirc for this to work
+python -m twine upload dist/* --repository pandas-ylt

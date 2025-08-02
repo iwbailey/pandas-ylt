@@ -31,9 +31,7 @@ class Layer:
             if k in kwargs and kwargs[k] is not None:
                 other_layer_params[k] = kwargs[k]
 
-        limit = min(limit, other_layer_params['agg_limit'])
-
-        self._limit = limit
+        self._occ_limit = limit
         self._xs = xs
         self._share = share
         self._agg_limit = other_layer_params['agg_limit']
@@ -51,13 +49,13 @@ class Layer:
 
     @property
     def limit(self):
-        """Get the layer limit"""
-        return self._limit
+        """Get the layer occurrence limit"""
+        return self._occ_limit
 
     @property
     def notional_limit(self):
-        """The share of the limit"""
-        return self._limit * self._share
+        """The share of the occurrence limit"""
+        return self._occ_limit * self._share
 
     @property
     def agg_limit(self):
@@ -81,7 +79,7 @@ class Layer:
         if self._agg_limit == np.inf:
             return np.inf
 
-        return max(self._agg_limit - self._limit, 0.0)
+        return max(self._agg_limit - self._occ_limit, 0.0)
 
     def reinst_cost(self, agg_loss):
         """Calculate the reinstatement cost for a given annual loss"""
@@ -94,7 +92,7 @@ class Layer:
     def loss(self, event_loss, prior_agg_loss=0.0):
         """Return the event loss after applying layer terms """
 
-        loss = np.clip(event_loss - self._xs, a_min=0.0, a_max=self._limit)
+        loss = np.clip(event_loss - self._xs, a_min=0.0, a_max=self._occ_limit)
 
         updated_agg_xs = max(self._agg_xs - prior_agg_loss, 0.0)
         remaining_limit = max(self._agg_limit -
@@ -108,7 +106,7 @@ class Layer:
         """Get the YELT for losses to the layer"""
 
         # Apply occurrence conditions
-        occ_loss = yelt_in.yel.apply_layer(limit=self.limit, xs=self._xs)
+        occ_loss = yelt_in.yel.apply_layer(limit=self._occ_limit, xs=self._xs)
 
         # Calculate cumulative loss in year and apply agg conditions
         cumul_loss = occ_loss.yel.to_aggloss_in_year()

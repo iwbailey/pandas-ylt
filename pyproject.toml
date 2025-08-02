@@ -15,6 +15,7 @@ requires-python = ">=3.7"
 dependencies = [
     "pandas>=2.2",
     "numpy>=2.1",
+    "scipy>=1.14",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -24,7 +25,6 @@ classifiers = [
 [project.optional-dependencies]
 dev = [
     "matplotlib>=3.9",
-    "scipy>=1.14",
     "pytest>=8.3",
     "jupyter",
     "jinja2"

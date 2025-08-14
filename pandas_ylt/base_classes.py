@@ -66,8 +66,7 @@ class LossSeries:
 
         return loss_series
 
-    def apply_layer(self, limit=None, xs=0.0, share=1.0, is_franchise=False,
-                    is_step=False):
+    def apply_layer(self, limit=None, xs=0.0, share=1.0, **kwargs):
         """Calculate the loss to a layer for each entry
 
         No franchise: If loss > xs, then loss is min(limit, loss - xs) * share.
@@ -79,10 +78,10 @@ class LossSeries:
 
         :param share: proportion of loss after applying limit and excess
 
-        :param is_franchise: if True, the xs acts as a loss threshold rather than
-        retention.
-
-        :param is_step: if True, all losses above the excess have a loss=share
+        :param kwargs: additional arguments.
+            is_franchise (bool): if True, the xs acts as a loss threshold rather than
+            retention.
+            is_step: if True, all losses above the excess have a loss=share
 
         :returns: a loss series for the loss to the layer. Zero losses are included.
 
@@ -92,10 +91,11 @@ class LossSeries:
         layer_losses = np.clip(self._obj - xs, a_min=0.0, a_max=limit)
 
         # Apply the franchise xs for non-zero losses
-        if is_franchise:
+        if 'is_franchise' in kwargs and kwargs['is_franchise']:
             layer_losses.loc[layer_losses > 0] += xs
 
-        if is_step:
+        # Use fixed loss for all losses above xs if a step layer
+        if 'is_step' in kwargs and kwargs['is_step']:
             layer_losses.loc[layer_losses > 0] = 1.0
 
         # Apply the share and exit

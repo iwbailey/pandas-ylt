@@ -1,5 +1,6 @@
 """Class to define a generic policy layer"""
 from typing import List
+import warnings
 import numpy as np
 
 
@@ -22,7 +23,7 @@ class Layer:
         other_layer_params = {
             'agg_limit': np.inf,
             'agg_xs': 0.0,
-            'reinst_rate': 0.0,
+            'reinst_at': 0.0,
             'premium': 0.0,
         }
 
@@ -36,8 +37,21 @@ class Layer:
         self._share = share
         self._agg_limit = other_layer_params['agg_limit']
         self._agg_xs = other_layer_params['agg_xs']
-        self._reinst_rate = other_layer_params['reinst_rate']
+        self._reinst_at = other_layer_params['reinst_at']
         self._premium = other_layer_params['premium']
+
+        if 'reinst_rate' in kwargs and self._reinst_at == 0.0:
+            warnings.warn(
+                    ("Use of reinst_rate is deprecated and will be removed " +
+                    "in a future release. Use reinst_at and premium instead."),
+                    DeprecationWarning,
+                    stacklevel=2)
+
+            if self._premium != 0.0:
+                self._reinst_at = kwargs['reinst_rate'] * self._occ_limit / self._premium
+            else:
+                self._premium = kwargs['reinst_rate'] * self._occ_limit
+                self._reinst_at = 1.0
 
         self._validate(self)
 
@@ -68,9 +82,19 @@ class Layer:
         return self._premium
 
     @property
+    def rate_on_line(self):
+        """The rate-on-line for the layer"""
+        return self._premium / self.notional_limit
+
+    @property
+    def reinst_at(self):
+        """Get the proportion of premium to reinstate the limit"""
+        return self._reinst_at
+
+    @property
     def reinst_rate(self):
         """Get the reinstatement rate-on-line"""
-        return self._reinst_rate
+        return self._reinst_at * self.rate_on_line
 
     @property
     def max_reinstated_limit(self) -> float:
@@ -82,12 +106,15 @@ class Layer:
         return max(self._agg_limit - self._occ_limit, 0.0)
 
     def reinst_cost(self, agg_loss):
-        """Calculate the reinstatement cost for a given annual loss"""
+        """Calculate the reinstatement cost for a given annual loss
+
+        Assumes agg xs and share has not yet been applied
+        """
 
         reinstated_limit = min(max(agg_loss - self._agg_xs, 0.0),
                                self.max_reinstated_limit)
 
-        return reinstated_limit * self._reinst_rate * self._share
+        return reinstated_limit * self.reinst_rate * self._share
 
     def loss(self, event_loss, prior_agg_loss=0.0):
         """Return the event loss after applying layer terms """

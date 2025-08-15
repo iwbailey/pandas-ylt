@@ -23,35 +23,35 @@ def test_validation_error(layer_params):
     "layer_params, agg_loss, expected",
     [
         # 2 reinstatements. 1.75 reinstatements used
-        ({'limit': 2.0, 'agg_limit': 6.0, 'reinst_rate': 0.075},
-         3.5, 1.75 * 2.0 * 0.075),
+        ({'limit': 2.0, 'agg_limit': 6.0, 'premium': 0.15, 'reinst_at': 1.0},
+         3.5, 1.75 * 0.15),
 
         # 2 reinstatements. 1.75 reinstatements used on layer with xs
-        ({'limit': 2.0, 'xs': 1.0, 'agg_limit': 6.0, 'reinst_rate': 0.075},
-         3.5, 1.75 * 2.0 * 0.075),
+        ({'limit': 2.0, 'xs': 1.0, 'agg_limit': 6.0, 'premium': 0.15, 'reinst_at': 1.0},
+         3.5, 1.75 * 0.15),
 
         # 2.5 reinstatements. 2.25 reinstatements used
-        ({'limit': 2.0, 'agg_limit': 7.0, 'reinst_rate': 0.075},
+        ({'limit': 2.0, 'agg_limit': 7.0, 'premium': 0.15, 'reinst_at': 1.0},
          4.5, 2.25 * 2.0 * 0.075),
 
         # 2.5 reinstatements. 2.5 reinstatements used
-        ({'limit': 2.0, 'agg_limit': 7.0, 'reinst_rate': 0.075},
+        ({'limit': 2.0, 'agg_limit': 7.0, 'premium': 0.15, 'reinst_at': 1.0},
          5.5, 2.5 * 2.0 * 0.075),
 
         # 3 reinstatements. 1.5 reinstatements used after agg_xs used
-        ({'limit': 2.0, 'agg_limit': 6.0, 'agg_xs': 1.0, 'reinst_rate': 0.075},
+        ({'limit': 2.0, 'agg_limit': 6.0, 'agg_xs': 1.0, 'premium': 0.15, 'reinst_at': 1.0},
          4.0, (2.0 + 1.0) * 0.075),
 
         # No reinstatemnts because limit is same as agg limit
-        ({'limit': 2.0, 'agg_limit': 2.0, 'reinst_rate': 0.075},
+        ({'limit': 2.0, 'agg_limit': 2.0, 'premium': 0.15, 'reinst_at': 1.0},
          5.5, 0.0),
 
         # No reinstatements where limit is more than agg limit
-        ({'limit': 2.0, 'agg_limit': 1.5, 'reinst_rate': 0.075},
+        ({'limit': 2.0, 'agg_limit': 1.5, 'premium': 0.15, 'reinst_at': 1.0},
          5.5, 0.0),
 
         # No reinstatements because reinst rate is zero
-        ({'limit': 2.0, 'agg_limit': 4.0, 'reinst_rate': 0.0},
+        ({'limit': 2.0, 'agg_limit': 4.0, 'reinst_at': 0.0},
          5.5, 0.0),
     ],
 )

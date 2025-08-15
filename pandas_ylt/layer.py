@@ -153,7 +153,7 @@ class Layer:
             # Reinstatements offset the loss of the layer, so subtract
             lyr_loss = lyr_loss - reinst_costs
 
-        return lyr_loss
+        return lyr_loss * self._share
 
 
 class MultiLayer:

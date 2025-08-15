@@ -129,6 +129,18 @@ class Layer:
 
         return loss * self._share
 
+    def ylt_loss_from_yelt_input(self, yelt_in):
+        """Get the YLT for losses to the layer"""
+
+        # Apply occurrence conditions
+        year_loss = (yelt_in
+                     .yel.apply_layer(limit=self._occ_limit, xs=self._xs)
+                     .yel.to_ylt()
+                     .yl.apply_layer(limit=self._agg_limit, xs=self._agg_xs)
+                     )
+
+        return year_loss * self._share
+
     def yelt_loss(self, yelt_in, net_reinst=False):
         """Get the YELT for losses to the layer"""
 

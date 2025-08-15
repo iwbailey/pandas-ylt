@@ -1,6 +1,7 @@
 """Class to define a generic policy layer"""
 from typing import List
 import warnings
+import pandas as pd
 import numpy as np
 
 
@@ -116,55 +117,55 @@ class Layer:
 
         return reinstated_limit * self.reinst_rate * self._share
 
-    def loss(self, event_loss, prior_agg_loss=0.0):
-        """Return the event loss after applying layer terms """
-
-        loss = np.clip(event_loss - self._xs, a_min=0.0, a_max=self._occ_limit)
-
-        updated_agg_xs = max(self._agg_xs - prior_agg_loss, 0.0)
-        remaining_limit = max(self._agg_limit -
-                              max(prior_agg_loss - self._agg_xs, 0.0), 0.0)
-
-        loss = np.clip(loss - updated_agg_xs, a_min=0.0, a_max=remaining_limit)
-
-        return loss * self._share
-
-    def ceded_ylt(self, yelt_in):
+    def ceded_ylt(self, yelt_in, only_reinstated=False):
         """Get the YLT for losses to the layer from an input year-event loss table"""
+
+        if only_reinstated:
+            agg_limit = self.max_reinstated_limit
+        else:
+            agg_limit = self._agg_limit
 
         year_loss = (yelt_in
                      .yel.apply_layer(limit=self._occ_limit, xs=self._xs)
                      .yel.to_ylt()
-                     .yl.apply_layer(limit=self._agg_limit, xs=self._agg_xs)
+                     .yl.apply_layer(limit=agg_limit, xs=self._agg_xs)
                      )
 
         return year_loss * self._share
 
-    def reinstated_limits(self, yelt_in):
-        """Get the reinstated limit per year from an input year-event loss table"""
+    def ceded_loss_in_year(self, event_losses):
+        """Return the total ceded loss for a set of event losses. """
 
-        reinst_count = (yelt_in
-                     .yel.apply_layer(limit=self._occ_limit, xs=self._xs)
-                     .yel.to_ylt()
-                     .yl.apply_layer(limit=self.max_reinstated_limit, xs=self._agg_xs)
-                     )
+        event_losses = pd.DataFrame({'Year': 1, 'Loss': event_losses})
+        event_losses = event_losses.set_index('Year', append=True)['Loss']
+        event_losses.attrs['n_yrs'] = 1
 
-        return reinst_count
+        return self.ceded_ylt(event_losses).iloc[0]
 
-    def ceded_yelt(self, yelt_in, net_reinst=False):
-        """Get the YELT for losses to the layer"""
+    def ceded_yelt(self, yelt_in, only_reinstated=False, net_reinst=False):
+        """Get the YELT for losses to the layer
 
-        # Apply occurrence conditions
-        occ_loss = yelt_in.yel.apply_layer(limit=self._occ_limit, xs=self._xs)
+        Aggregate limit and excess are calculated according to the order of events in
+        the input YELT. So if you want to apply consecutively, sort the YELT by day of
+        year. If you want to apply in order of event size, sort by loss, descending.
+        """
 
-        # Calculate cumulative loss in year and apply agg conditions
-        cumul_loss = occ_loss.yel.to_aggloss_in_year()
-        cumul_loss = np.clip(cumul_loss - self._agg_xs, a_min=0.0, a_max=self.agg_limit)
-        cumul_loss = cumul_loss.loc[cumul_loss != 0.0]
+        if only_reinstated:
+            agg_limit = self.max_reinstated_limit
+        else:
+            agg_limit = self._agg_limit
+
+
+        cumul_loss = (yelt_in
+                      # Apply occurrence conditions
+                      .yel.apply_layer(limit=self._occ_limit, xs=self._xs)
+                      # Calculate cumulative loss in year and apply agg conditions
+                      .groupby(yelt_in.yel.col_year).cumsum()
+                      .yel.apply_layer(limit=agg_limit, xs=self._agg_xs)
+                      )
 
         # Convert back into the occurrence loss
-        lyr_loss = cumul_loss.groupby('Year').diff()
-        lyr_loss = lyr_loss.fillna(cumul_loss)
+        lyr_loss = cumul_loss.groupby(yelt_in.yel.col_year).diff().fillna(cumul_loss)
         lyr_loss.attrs['n_yrs'] = yelt_in.yel.n_yrs
 
         if net_reinst:
@@ -176,6 +177,16 @@ class Layer:
             lyr_loss = lyr_loss - reinst_costs
 
         return lyr_loss * self._share
+
+    def ceded_event_losses_in_year(self, event_losses):
+        """Return the ceded loss per event for a set of event losses. """
+
+        event_losses = pd.DataFrame({'Year': 1, 'Loss': event_losses})
+        event_losses = event_losses.set_index('Year', append=True)['Loss']
+        event_losses.attrs['n_yrs'] = 1
+
+        return self.ceded_yelt(event_losses).values
+
 
 
 class MultiLayer:
@@ -235,7 +246,7 @@ class MultiLayer:
 
         return sum((lyr.reinst_cost(agg_loss) for lyr in self.layers))
 
-    def loss(self, event_loss, prior_agg_loss=0.0):
+    def loss(self, event_losses):
         """Return the event loss after applying layer terms """
 
-        return sum((lyr.loss(event_loss, prior_agg_loss) for lyr in self.layers))
+        return sum((lyr.ceded_loss_in_year(event_losses) for lyr in self.layers))

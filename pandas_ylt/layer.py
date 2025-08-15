@@ -129,10 +129,9 @@ class Layer:
 
         return loss * self._share
 
-    def ylt_loss_from_yelt_input(self, yelt_in):
-        """Get the YLT for losses to the layer"""
+    def ceded_ylt(self, yelt_in):
+        """Get the YLT for losses to the layer from an input year-event loss table"""
 
-        # Apply occurrence conditions
         year_loss = (yelt_in
                      .yel.apply_layer(limit=self._occ_limit, xs=self._xs)
                      .yel.to_ylt()
@@ -141,7 +140,18 @@ class Layer:
 
         return year_loss * self._share
 
-    def yelt_loss(self, yelt_in, net_reinst=False):
+    def reinstated_limits(self, yelt_in):
+        """Get the reinstated limit per year from an input year-event loss table"""
+
+        reinst_count = (yelt_in
+                     .yel.apply_layer(limit=self._occ_limit, xs=self._xs)
+                     .yel.to_ylt()
+                     .yl.apply_layer(limit=self.max_reinstated_limit, xs=self._agg_xs)
+                     )
+
+        return reinst_count
+
+    def ceded_yelt(self, yelt_in, net_reinst=False):
         """Get the YELT for losses to the layer"""
 
         # Apply occurrence conditions

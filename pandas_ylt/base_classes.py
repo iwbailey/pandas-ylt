@@ -70,7 +70,7 @@ class LossSeries:
         """Calculate the loss to a layer for each entry
 
         No franchise: If loss > xs, then loss is min(limit, loss - xs) * share.
-        With franchise: If loss > xs, then loss is min(limit + xs, loss) * share
+        With franchise: If loss > xs, then loss is min(limit, loss) * share
 
         :param limit: maximum loss to the layer, before share aplied
 
@@ -87,16 +87,17 @@ class LossSeries:
 
         """
 
-        # Apply layer attachment and limit
-        layer_losses = np.clip(self._obj - xs, a_min=0.0, a_max=limit)
-
-        # Apply the franchise xs for non-zero losses
         if 'is_franchise' in kwargs and kwargs['is_franchise']:
-            layer_losses.loc[layer_losses > 0] += xs
+            # Apply the franchise xs for non-zero losses
+            layer_losses = self._obj.where(self._obj >= xs, 0.0).clip(upper=limit)
 
-        # Use fixed loss for all losses above xs if a step layer
-        if 'is_step' in kwargs and kwargs['is_step']:
-            layer_losses.loc[layer_losses > 0] = 1.0
+        elif 'is_step' in kwargs and kwargs['is_step']:
+            # Use fixed loss for all losses above xs if a step layer
+            layer_losses = (self._obj > xs) * 1.0
+
+        else:
+            # Apply layer attachment and limit
+            layer_losses = np.clip(self._obj - xs, a_min=0.0, a_max=limit)
 
         # Apply the share and exit
         return layer_losses * share

@@ -3,7 +3,34 @@
 import pytest
 from pytest import approx
 import numpy as np
-from pandas_ylt.layer import Layer, MultiLayer
+from pandas_ylt.layer import apply_layer, Layer, variable_reinst_layer
+
+
+@pytest.mark.parametrize(
+    "layer_params, loss, expected",
+    [
+        ({'limit': 5.0}, 4.0, 4.0),
+        ({'limit': 5.0}, 5.0, 5.0),
+        ({'limit': 5.0}, 7.0, 5.0),
+        ({'limit': 5.0, 'xs': 8}, 4.0, 0.0),
+        ({'limit': 5.0, 'xs': 8}, 8.0, 0.0),
+        ({'limit': 5.0, 'xs': 8}, 10.0, 2.0),
+        ({'limit': 5.0, 'xs': 8}, 14.0, 5.0),
+        ({'limit': 5.0, 'xs': 8, 'is_franchise': True}, 14.0, 5.0),
+        ({'limit': 10.0, 'xs': 8, 'is_franchise': True}, 9.0, 9.0),
+        ({'limit': 10.0, 'xs': 8, 'is_franchise': True}, 14.0, 10.0),
+        ({'limit': 5.0, 'xs': 8, 'share': 0.5}, 10.0, 1.0),
+        ({'limit': 5.0, 'xs': 8, 'share': 0.2}, 14.0, 1.0),
+        ({'limit': 13.0, 'xs': 8, 'share': 0.5, 'is_franchise': True}, 12.0, 6.0),
+        ({'limit': 13.0, 'xs': 8, 'share': 0.5, 'is_step': True}, 12.0, 0.5),
+        ({'is_step': True}, 12.0, 1.0),
+        ({'xs': 10, 'share': 100, 'is_step': True}, 12.0, 100.0),
+        ({'xs': 10, 'share': 100, 'is_step': True}, 9.0, 0.0),
+    ])
+def test_apply_layer(layer_params, loss, expected):
+    """Test a layer is applied correctly"""
+
+    assert apply_layer(loss, **layer_params) == expected
 
 
 @pytest.mark.parametrize(

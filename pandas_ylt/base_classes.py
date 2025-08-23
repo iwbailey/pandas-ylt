@@ -1,6 +1,5 @@
 """Base class for all loss tables"""
 import pandas as pd
-import numpy as np
 
 
 DEFAULT_COLNAME_LOSS = "Loss"
@@ -65,39 +64,3 @@ class LossSeries:
         loss_series.attrs['n_yrs'] = n_yrs
 
         return loss_series
-
-    def apply_layer(self, limit=None, xs=0.0, share=1.0, **kwargs):
-        """Calculate the loss to a layer for each entry
-
-        No franchise: If loss > xs, then loss is min(limit, loss - xs) * share.
-        With franchise: If loss > xs, then loss is min(limit, loss) * share
-
-        :param limit: maximum loss to the layer, before share aplied
-
-        :param xs: minimum loss a.k.a excess/deductible for the layer
-
-        :param share: proportion of loss after applying limit and excess
-
-        :param kwargs: additional arguments.
-            is_franchise (bool): if True, the xs acts as a loss threshold rather than
-            retention.
-            is_step: if True, all losses above the excess have a loss=share
-
-        :returns: a loss series for the loss to the layer. Zero losses are included.
-
-        """
-
-        if 'is_franchise' in kwargs and kwargs['is_franchise']:
-            # Apply the franchise xs for non-zero losses
-            layer_losses = self._obj.where(self._obj >= xs, 0.0).clip(upper=limit)
-
-        elif 'is_step' in kwargs and kwargs['is_step']:
-            # Use fixed loss for all losses above xs if a step layer
-            layer_losses = (self._obj > xs) * 1.0
-
-        else:
-            # Apply layer attachment and limit
-            layer_losses = np.clip(self._obj - xs, a_min=0.0, a_max=limit)
-
-        # Apply the share and exit
-        return layer_losses * share

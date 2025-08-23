@@ -1,8 +1,47 @@
 """Class to define a generic policy layer"""
-from typing import List
-import warnings
-import pandas as pd
 import numpy as np
+
+
+def apply_layer(losses, limit=None, xs=0.0, share=1.0, **kwargs):
+    """Calculate the loss to a basic layer for each entry
+
+    No franchise: If loss > xs, then loss is min(limit, loss - xs) * share.
+    With franchise: If loss > xs, then loss is min(limit, loss) * share
+
+    :param losses: the losses before the layer terms have been applied
+
+    :param limit: maximum loss to the layer, before share aplied
+
+    :param xs: minimum loss a.k.a excess/deductible for the layer
+
+    :param share: proportion of loss after applying limit and excess
+
+    :param kwargs: additional arguments.
+        is_franchise (bool): if True, the xs acts as a loss threshold rather than
+        retention.
+        is_step: if True, all losses above the excess have a loss=share
+
+    :returns: a loss series for the loss to the layer. Zero losses are included.
+
+    """
+
+    if isinstance(losses, list):
+        losses = np.array(losses)
+
+    if 'is_franchise' in kwargs and kwargs['is_franchise']:
+        # Apply the franchise xs for non-zero losses
+        layer_losses = np.clip(np.where(losses >= xs, losses, 0.0), a_min=0.0, a_max=limit)
+
+    elif 'is_step' in kwargs and kwargs['is_step']:
+        # Use fixed loss for all losses above xs if a step layer
+        layer_losses = (losses >= xs) * 1.0
+
+    else:
+        # Apply layer attachment and limit
+        layer_losses = np.clip(losses - xs, a_min=0.0, a_max=limit)
+
+    # Apply the share and exit
+    return layer_losses * share
 
 
 class Layer:
@@ -40,20 +79,6 @@ class Layer:
         self._agg_xs = other_layer_params['agg_xs']
         self._reinst_at = other_layer_params['reinst_at']
         self._premium = other_layer_params['premium']
-
-        if 'reinst_rate' in kwargs and self._reinst_at == 0.0:
-            warnings.warn(
-                    ("Use of reinst_rate is deprecated and will be removed " +
-                    "in a future release. Use reinst_at and premium instead."),
-                    DeprecationWarning,
-                    stacklevel=2)
-
-            if self._premium != 0.0:
-                self._reinst_at = kwargs['reinst_rate'] * self._occ_limit / self._premium
-            else:
-                self._premium = kwargs['reinst_rate'] * self._occ_limit
-                self._reinst_at = 1.0
-
         self._validate(self)
 
     @staticmethod
@@ -106,16 +131,38 @@ class Layer:
 
         return max(self._agg_limit - self._occ_limit, 0.0)
 
-    def reinst_cost(self, agg_loss):
-        """Calculate the reinstatement cost for a given annual loss
+    def _apply_occurrence_terms(self, event_losses):
+        """Return the loss net of occurrence limit and excess"""
+        return apply_layer(event_losses, limit=self._occ_limit, xs=self._xs)
 
-        Assumes agg xs and share has not yet been applied
-        """
+    def ceded_loss_in_year(self, event_losses):
+        """Return the total ceded loss for a set of event losses in a single year. """
+        return apply_layer(
+                np.sum(self._apply_occurrence_terms(event_losses)),
+                limit=self._agg_limit, xs=self._agg_xs, share=self._share)
 
-        reinstated_limit = min(max(agg_loss - self._agg_xs, 0.0),
-                               self.max_reinstated_limit)
+    def reinstated_limit_in_year(self, event_losses):
+        """Return the reinstated limit for a set of event losses in a single year. """
+        return apply_layer(
+                np.sum(self._apply_occurrence_terms(event_losses)),
+                limit=self.max_reinstated_limit, xs=self._agg_xs, share=self._share)
 
-        return reinstated_limit * self.reinst_rate * self._share
+    def ceded_event_losses_in_year(self, event_losses):
+        """Return the ceded loss per event for a set of event losses. """
+
+        cumulative_losses = apply_layer(
+                np.cumsum(self._apply_occurrence_terms(event_losses)),
+                limit=self._agg_limit, xs=self._agg_xs, share=self._share)
+
+        return np.diff(cumulative_losses, prepend=0.0)
+
+    def reinstated_event_losses_in_year(self, event_losses):
+        """Return the reinstated limit per event"""
+        cumulative_losses = apply_layer(
+                np.cumsum(self._apply_occurrence_terms(event_losses)),
+                limit=self.max_reinstated_limit, xs=self._agg_xs, share=self._share)
+
+        return np.diff(cumulative_losses, prepend=0.0)
 
     def ceded_ylt(self, yelt_in, only_reinstated=False):
         """Get the YLT for losses to the layer from an input year-event loss table"""
@@ -126,23 +173,14 @@ class Layer:
             agg_limit = self._agg_limit
 
         year_loss = (yelt_in
-                     .yel.apply_layer(limit=self._occ_limit, xs=self._xs)
+                     .apply(apply_layer, limit=self._occ_limit, xs=self._xs)
                      .yel.to_ylt()
-                     .yl.apply_layer(limit=agg_limit, xs=self._agg_xs)
+                     .apply(apply_layer, limit=agg_limit, xs=self._agg_xs)
                      )
 
         return year_loss * self._share
 
-    def ceded_loss_in_year(self, event_losses):
-        """Return the total ceded loss for a set of event losses. """
-
-        event_losses = pd.DataFrame({'Year': 1, 'Loss': event_losses})
-        event_losses = event_losses.set_index('Year', append=True)['Loss']
-        event_losses.attrs['n_yrs'] = 1
-
-        return self.ceded_ylt(event_losses).iloc[0]
-
-    def ceded_yelt(self, yelt_in, only_reinstated=False, net_reinst=False):
+    def ceded_yelt(self, yelt_in, only_reinstated=False):
         """Get the YELT for losses to the layer
 
         Aggregate limit and excess are calculated according to the order of events in
@@ -155,98 +193,109 @@ class Layer:
         else:
             agg_limit = self._agg_limit
 
-
         cumul_loss = (yelt_in
                       # Apply occurrence conditions
-                      .yel.apply_layer(limit=self._occ_limit, xs=self._xs)
+                      .apply(apply_layer, limit=self._occ_limit, xs=self._xs)
                       # Calculate cumulative loss in year and apply agg conditions
                       .groupby(yelt_in.yel.col_year).cumsum()
-                      .yel.apply_layer(limit=agg_limit, xs=self._agg_xs)
+                      .apply(apply_layer, limit=agg_limit, xs=self._agg_xs)
                       )
 
         # Convert back into the occurrence loss
         lyr_loss = cumul_loss.groupby(yelt_in.yel.col_year).diff().fillna(cumul_loss)
         lyr_loss.attrs['n_yrs'] = yelt_in.yel.n_yrs
 
-        if net_reinst:
-            reinst_closs = np.minimum(cumul_loss, self.max_reinstated_limit)
-            reinst_lyr_loss = reinst_closs.groupby('Year').diff().fillna(reinst_closs)
-            reinst_costs = reinst_lyr_loss * self.reinst_rate
-
-            # Reinstatements offset the loss of the layer, so subtract
-            lyr_loss = lyr_loss - reinst_costs
-
         return lyr_loss * self._share
 
-    def ceded_event_losses_in_year(self, event_losses):
-        """Return the ceded loss per event for a set of event losses. """
+    def paid_reinstatements(self, reinstated_limit):
+        """Fraction of premium paid for reinstatements calculated from the amount of
+        limit reinstated
 
-        event_losses = pd.DataFrame({'Year': 1, 'Loss': event_losses})
-        event_losses = event_losses.set_index('Year', append=True)['Loss']
-        event_losses.attrs['n_yrs'] = 1
+        :param reinstated_limit: The amount of limit reinstated after applying the share
+        """
 
-        return self.ceded_yelt(event_losses).values
-
-
-
-class MultiLayer:
-    """Class for a series of layers that acts as a single layer"""
-
-    def __init__(self, layers: List[Layer]  = None):
-        self._layers = layers
-
-    @classmethod
-    def from_variable_reinst_lyr_params(
-            cls,
-            limit,
-            reinst_rates: List[float],
-            **kwargs
-    ):
-        """Initialise a multilayer to represent a single layer with variable
-        reinstatement costs"""
-
-        n_reinst = len(reinst_rates)
-
-        if 'agg_xs' not in kwargs:
-            agg_xs = 0
-        else:
-            agg_xs = kwargs['agg_xs']
-
-        other_layer_params = {k: v for k, v in kwargs.items()
-                              if k not in ('limit', 'agg_xs', 'agg_limit', 'reinst_rate')}
-
-        layers = []
-        for i in range(n_reinst):
-            this_agg_xs = agg_xs + i * limit
-            layers.append(
-                Layer(limit,
-                    agg_limit=limit*2,
-                    agg_xs=this_agg_xs,
-                    reinst_rate=reinst_rates[i],
-                      **other_layer_params
-                )
-            )
-
-        layers.append(
-            Layer(limit, agg_limit=limit,
-                  agg_xs=agg_xs + n_reinst * limit,
-                  reinst_rate=0.0, **other_layer_params)
-        )
-
-        return cls(layers)
-
-    @property
-    def layers(self):
-        """Return the list of layers"""
-        return self._layers
+        return (reinstated_limit / self.notional_limit ) * self._reinst_at
 
 
-    def reinst_cost(self, agg_loss):
-        """Calculate the reinstatement cost for a given annual loss"""
+def variable_reinst_layer(limit: float = None,
+                          xs: float = 0.0,
+                          share: float = 1.0,
+                          reinst_at: list = None,
+                          ):
+    """Single CATXL layer with different cost of each reinstatement represented by
+    multiple layers """
 
-        return sum((lyr.reinst_cost(agg_loss) for lyr in self.layers))
+    agg_xs = 0.0
+    agg_limit = limit * 2
+    layers = []
+    for this_reinst_at in reinst_at:
+        this_layer = Layer(limit=limit, xs=xs, share=share, agg_xs=agg_xs,
+                           agg_limit=agg_limit, reinst_at=this_reinst_at)
+        agg_xs += limit
+        layers.append(this_layer)
 
-    def loss(self, event_losses):
-        """Return the event loss after applying layer terms """
+    return layers
 
-        return sum((lyr.ceded_loss_in_year(event_losses) for lyr in self.layers))
+
+#
+# class MultiLayer:
+#     """Class for a series of layers that acts as a single layer"""
+#
+#     def __init__(self, layers: List[Layer]  = None):
+#         self._layers = layers
+#
+#     @classmethod
+#     def from_variable_reinst_lyr_params(
+#             cls,
+#             limit,
+#             reinst_rates: List[float],
+#             **kwargs
+#     ):
+#         """Initialise a multilayer to represent a single layer with variable
+#         reinstatement costs"""
+#
+#         n_reinst = len(reinst_rates)
+#
+#         if 'agg_xs' not in kwargs:
+#             agg_xs = 0
+#         else:
+#             agg_xs = kwargs['agg_xs']
+#
+#         other_layer_params = {k: v for k, v in kwargs.items()
+#                               if k not in ('limit', 'agg_xs', 'agg_limit', 'reinst_rate')}
+#
+#         layers = []
+#         for i in range(n_reinst):
+#             this_agg_xs = agg_xs + i * limit
+#             layers.append(
+#                 Layer(limit,
+#                     agg_limit=limit*2,
+#                     agg_xs=this_agg_xs,
+#                     reinst_rate=reinst_rates[i],
+#                       **other_layer_params
+#                 )
+#             )
+#
+#         layers.append(
+#             Layer(limit, agg_limit=limit,
+#                   agg_xs=agg_xs + n_reinst * limit,
+#                   reinst_rate=0.0, **other_layer_params)
+#         )
+#
+#         return cls(layers)
+#
+#     @property
+#     def layers(self):
+#         """Return the list of layers"""
+#         return self._layers
+#
+#
+#     def reinst_cost(self, agg_loss):
+#         """Calculate the reinstatement cost for a given annual loss"""
+#
+#         return sum((lyr.reinst_cost(agg_loss) for lyr in self.layers))
+#
+#     def loss(self, event_losses):
+#         """Return the event loss after applying layer terms """
+#
+#         return sum((lyr.ceded_loss_in_year(event_losses) for lyr in self.layers))

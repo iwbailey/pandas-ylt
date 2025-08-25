@@ -148,18 +148,18 @@ class YearLossTable(LossSeries):
             .rename("ExProb")
         )
 
+    def loss_exprob(self, x):
+        """Get the exceedance prob for a specific single loss value"""
+        return float((self._obj >= x).sum()) / self.n_yrs
+
     def loss_exprobs(self, losses):
         """Get the exceedance probabilities for speocific loss levels"""
 
-        def loss_exprob(x):
-            """Get the exceedance prob for a specific loss value"""
-            return (self._obj >= x).sum() / self.n_yrs
-
         try:
-            return np.array([loss_exprob(x) for x in losses])
+            return np.array([self.loss_exprob(x) for x in losses])
         except TypeError:
             # Case where input is a single value
-            return loss_exprob(losses)
+            return self.loss_exprob(losses)
 
     def to_loss_excurve(self, **kwargs):
         """Get the full loss-exprob curve

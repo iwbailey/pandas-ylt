@@ -185,28 +185,6 @@ class TestYELTmethods(unittest.TestCase):
                     )
         self.assertTrue((diffprob >= 0.0).all())
 
-    def test_apply_layer(self):
-        """Test a layer is applied correctly"""
-
-        # Create a yelt
-        this_yelt = pd.Series([5, 7, 8, 10], name='loss',
-                              index=pd.MultiIndex.from_tuples([
-                                  (1, 0, 1), (1, 1, 2), (1, 2, 3), (1, 3, 4)],
-                                      names=('year', 'EventID', 'dayofyear')))
-        this_yelt.attrs['n_yrs'] = 5
-
-        # Test an upper limit
-        self.assertTrue((this_yelt.yel.apply_layer(limit=5) == 5.0).all())
-
-        # Test a lower threshold
-        tmp = this_yelt.yel.apply_layer(xs=8)
-
-        # Check we only get one non-zero value back
-        self.assertEqual((tmp > 0.0).sum(), 1)
-
-        # Check the loss of 10 is changed to 2
-        self.assertEqual(tmp.xs(3, level='EventID').iloc[0], 2.0)
-
     def test_severity_curve(self):
         """Test we can calculate a severity curve"""
 

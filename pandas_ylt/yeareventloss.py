@@ -159,20 +159,6 @@ class YearEventLossTable(LossSeries):
 
         return agg_loss
 
-    def apply_layer(self, limit=None, xs=0.0, share=1.0, is_franchise=False):
-        """Calculate the loss to a layer for each event"""
-
-        # Apply layer attachment and limit
-        layer_losses = share * np.clip(self._obj - xs, a_min=0.0, a_max=limit)
-
-        # Keep only non-zero losses to make the next steps quicker
-        layer_losses = layer_losses.loc[layer_losses > 0]
-
-        if is_franchise:
-            layer_losses += xs
-
-        return layer_losses
-
     def to_loss_excurve(self, **kwargs):
         """Get the full loss exceedance frequency curve"""
 
@@ -202,7 +188,7 @@ class YearEventLossTable(LossSeries):
         return ef_curve
 
     def loss_at_exfreqs(self, exfreqs, **kwargs):
-        """Return the largest losses exceeded at specified exceednance"""
+        """Return the largest losses exceeded at specified frequency"""
         ef_curve = self.to_ef_curve(**kwargs)
 
         return ef_curve.loss_at_exceedance(exfreqs)

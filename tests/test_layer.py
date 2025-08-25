@@ -225,4 +225,80 @@ def test_variable_reinst_cost(layer_params, reinst_rates, event_loss, expected_l
     assert sum(losses) == approx(expected_loss)
     assert sum(paid_reinst) == approx(expected_reinst)
 
-    assert this_lyr.reinst_cost(agg_loss) == approx(expected)
+
+    # reinstatements = [l.paid_reinstatements for l in layers]
+
+
+@pytest.mark.parametrize(
+        "layer_params, event_loss, expected_loss",
+        [
+            # Case 1: unused limit in top layer drops down for second loss in lower layer
+            ([{'limit': 1.0, 'xs': 1.0, 'agg_limit': 2.0},
+              {'limit': 1.0, 'xs': 10.0, 'agg_limit': 1.0}], [11.0, 2.0], [2.0, 0.0]),
+            ([{'limit': 1.0, 'xs': 1.0, 'agg_limit': 2.0},
+              {'limit': 1.0, 'xs': 10.0, 'agg_limit': 1.0}], [5.0, 2.0], [1.0, 1.0]),
+            ([{'limit': 1.0, 'xs': 1.0, 'agg_limit': 2.0},
+              {'limit': 1.0, 'xs': 10.0, 'agg_limit': 1.0}], [10.5, 2.0], [1.5, 0.5]),
+            ([{'limit': 1.0, 'xs': 1.0, 'agg_limit': 2.0},
+              {'limit': 1.0, 'xs': 10.0, 'agg_limit': 1.0}], [5.0, 2.0, 11.0],
+             [1.0, 1.0, 0.0]),
+        ],
+)
+def test_top_and_drop(layer_params, event_loss, expected_loss):
+    """Test drop down structures"""
+
+    layer1 = Layer(**layer_params[0])
+    layer2 = Layer(**layer_params[1])
+
+    lyr_losses1 = layer1.ceded_event_losses_in_year(event_loss)
+    lyr_losses2 = layer2.ceded_event_losses_in_year(event_loss)
+
+    # Apply the agg limit to the combined loss
+    layer3 = Layer(agg_limit=layer_params[0]['agg_limit'])
+    lyr_losses3 = layer3.ceded_event_losses_in_year(lyr_losses1 + lyr_losses2)
+
+    assert lyr_losses3 == approx(np.array(expected_loss))
+
+
+@pytest.mark.parametrize(
+        "layer_params, xs_dropdown, event_loss, expected_loss",
+        [
+            # xs reduces for the second loss but exit stays the same
+            ({'limit': 1.0, 'xs': 2.0, 'agg_limit': 3.0}, 1.0,
+             [3.0, 3.0], [1.0, 2.0]),
+            ({'limit': 1.0, 'xs': 2.0, 'agg_limit': 3.0}, 1.0,
+             [2.5, 3.0], [0.5, 2.0]),
+            ({'limit': 1.0, 'xs': 2.0, 'agg_limit': 3.0}, 1.0,
+             [1.5, 1.5, 2.1], [0.0, 0.0, 0.1]),
+            ({'limit': 1.0, 'xs': 2.0, 'agg_limit': 3.0}, 1.0,
+             [1.5, 2.1, 2.0, 2.0, 2.0], [0.0, 0.1, 1.0, 1.0, 0.9]),
+        ],
+)
+def test_dropdown(layer_params, xs_dropdown, event_loss, expected_loss):
+    """Test drop down structures"""
+
+    # Pre-drop down layer
+    layer1 = Layer(**layer_params)
+    lyr_losses1 = layer1.ceded_event_losses_in_year(event_loss)
+
+    # After drop down, before agg limit
+    dropdown_params = {'xs': xs_dropdown,
+                       'limit': layer_params['limit'] + (layer_params['xs'] - xs_dropdown)}
+
+    layer2 = Layer(**dropdown_params)
+    lyr_losses2 = layer2.ceded_event_losses_in_year(event_loss)
+
+    # Take 1st pre-drop down loss and all others from the post-drop down layer
+    i = np.nonzero(lyr_losses1)[0][0] + 1
+
+    if i <= len(lyr_losses1):
+        lyr_losses2[:i] = 0.0
+        lyr_losses1[i:] = 0.0
+
+    lyr_losses3 = lyr_losses1 + lyr_losses2
+
+    # Apply the agg limit
+    layer3 = Layer(agg_limit=layer_params['agg_limit'])
+    lyr_losses = layer3.ceded_event_losses_in_year(lyr_losses3)
+
+    assert lyr_losses == approx(np.array(expected_loss))

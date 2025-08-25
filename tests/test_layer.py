@@ -2,6 +2,7 @@
 
 import pytest
 from pytest import approx
+import pandas as pd
 import numpy as np
 from pandas_ylt.layer import apply_layer, Layer, variable_reinst_layer
 
@@ -46,91 +47,54 @@ def test_validation_error(layer_params):
     with pytest.raises(ValueError):
         Layer(**layer_params)
 
-
 @pytest.mark.parametrize(
-    "layer_params, agg_loss, expected",
-    [
-        # 2 reinstatements. 1.75 reinstatements used
-        ({'limit': 2.0, 'agg_limit': 6.0, 'premium': 0.15, 'reinst_at': 1.0},
-         3.5, 1.75 * 0.15),
+        "layer_params, event_loss, expected",
+        [
+            # Simple single limit
+            ({'limit': 2.0}, 3.5, 2.0),
 
-        # 2 reinstatements. 1.75 reinstatements used on layer with xs
-        ({'limit': 2.0, 'xs': 1.0, 'agg_limit': 6.0, 'premium': 0.15, 'reinst_at': 1.0},
-         3.5, 1.75 * 0.15),
+            # Limit and xs
+            ({'limit': 2.0, 'xs': 1.0}, 2.5, 1.5),
 
-        # 2.5 reinstatements. 2.25 reinstatements used
-        ({'limit': 2.0, 'agg_limit': 7.0, 'premium': 0.15, 'reinst_at': 1.0},
-         4.5, 2.25 * 2.0 * 0.075),
+            # Limit and xs and share
+            ({'limit': 2.0, 'xs': 1.0, 'share': 0.5}, 2.5, 0.75),
 
-        # 2.5 reinstatements. 2.5 reinstatements used
-        ({'limit': 2.0, 'agg_limit': 7.0, 'premium': 0.15, 'reinst_at': 1.0},
-         5.5, 2.5 * 2.0 * 0.075),
+            # XS and no limit
+            ({'xs': 1.0}, 100, 99.0),
 
-        # 3 reinstatements. 1.5 reinstatements used after agg_xs used
-        ({'limit': 2.0, 'agg_limit': 6.0, 'agg_xs': 1.0, 'premium': 0.15, 'reinst_at': 1.0},
-         4.0, (2.0 + 1.0) * 0.075),
+            # Share only
+            ({'share': 0.35}, 100, 35.0),
 
-        # No reinstatemnts because limit is same as agg limit
-        ({'limit': 2.0, 'agg_limit': 2.0, 'premium': 0.15, 'reinst_at': 1.0},
-         5.5, 0.0),
+            # Agg limit and xs, plus occ limit
+            ({'agg_limit': 2.0, 'agg_xs': 1.0, 'xs': 1.0}, 2.5, 0.5),
 
-        # No reinstatements where limit is more than agg limit
-        ({'limit': 2.0, 'agg_limit': 1.5, 'premium': 0.15, 'reinst_at': 1.0},
-         5.5, 0.0),
+            # Agg limit and xs, plus occ limit with prior agg loss reducing agg limit
+            ({'agg_limit': 2.0, 'agg_xs': 1.0, 'xs': 1.0}, [2.0, 3.0], 2.0),
 
-        # No reinstatements because reinst rate is zero
-        ({'limit': 2.0, 'agg_limit': 4.0, 'reinst_at': 0.0},
-         5.5, 0.0),
-    ],
-)
-def test_reinst_cost(layer_params, agg_loss, expected):
-    """Test we can calculate the coorect reinstatement costs for agg loss to a layer"""
+            # Agg limit and xs, plus occ limit with prior agg loss eroding agg xs
+            ({'agg_limit': 2.0, 'agg_xs': 1.0, 'xs': 1.0}, [1.5, 3.0], 1.5),
 
-    this_lyr = Layer(**layer_params)
+            # Agg limit already used up
+            ({'agg_limit': 2.0, 'agg_xs': 1.0, 'xs': 1.0}, [4.0, 3.0], 2.0),
 
-    assert this_lyr.reinst_cost(agg_loss) == approx(expected)
-
-
-@pytest.mark.parametrize(
-    "layer_params, event_loss, expected",
-    [
-        # Simple single limit
-        ({'limit': 2.0}, [3.5], 2.0),
-
-        # Limit and xs
-        ({'limit': 2.0, 'xs': 1.0}, [2.5], 1.5),
-
-        # Limit and xs and share
-        ({'limit': 2.0, 'xs': 1.0, 'share': 0.5}, [2.5], 0.75),
-
-        # XS and no limit
-        ({'xs': 1.0}, [100], 99.0),
-
-        # Share only
-        ({'share': 0.35}, [100], 35.0),
-
-        # Agg limit and xs, plus occ limit
-        ({'agg_limit': 2.0, 'agg_xs': 1.0, 'xs': 1.0}, [2.5], 0.5),
-
-        # Agg limit and xs, plus occ limit with prior agg loss reducing agg limit
-        ({'agg_limit': 2.0, 'agg_xs': 1.0, 'xs': 1.0}, [2.0, 3.0], 2.0),
-
-        # Agg limit and xs, plus occ limit with prior agg loss eroding agg xs
-        ({'agg_limit': 2.0, 'agg_xs': 1.0, 'xs': 1.0}, [1.5, 3.0], 1.5),
-
-        # Agg limit already used up
-        ({'agg_limit': 2.0, 'agg_xs': 1.0, 'xs': 1.0}, [4.0, 3.0], 2.0),
-
-        # Agg limit and agg xs with no layer limit, single event uses all loss
-        ({'agg_limit': 2.0, 'agg_xs': 5.0}, [7.0], 2.0),
-    ],
+            # Agg limit and agg xs with no layer limit, single event uses all loss
+            ({'agg_limit': 2.0, 'agg_xs': 5.0}, [7.0], 2.0),
+        ],
 )
 def test_layer_loss(layer_params, event_loss, expected):
-    """Test we can calculate the coorect reinstatement costs for agg loss to a layer"""
+    """Test we can calculate annual loss to a layer from a set of input event losses"""
 
     this_lyr = Layer(**layer_params)
 
     assert this_lyr.ceded_loss_in_year(event_loss) == approx(expected)
+
+    # Test version that takes YELT as input
+    yelt = (pd.Series(event_loss, name='Loss').rename_axis('EventId')
+            .to_frame().assign(Year=1).set_index('Year', append=True)['Loss']
+    )
+    yelt.attrs['n_yrs'] = 1
+
+    assert this_lyr.ceded_ylt(yelt).iloc[0] == approx(expected)
 
 
 @pytest.mark.parametrize(
@@ -155,20 +119,110 @@ def test_layer_event_loss(layer_params, event_loss, expected):
 
     this_lyr = Layer(**layer_params)
 
-    assert this_lyr.ceded_event_losses_in_year(event_loss) == approx(np.array(expected))
+    event_losses = this_lyr.ceded_event_losses_in_year(event_loss)
+
+    assert  event_losses == approx(np.array(expected))
+
+    # Test version that takes YELT as input
+    yelt = (pd.Series(event_loss, name='Loss').rename_axis('EventId')
+            .to_frame().assign(Year=1).set_index('Year', append=True)['Loss']
+    )
+    yelt.attrs['n_yrs'] = 1
+
+    assert this_lyr.ceded_yelt(yelt).values == approx(np.array(expected))
+
+@pytest.mark.parametrize(
+    "layer_params, event_losses, expected",
+    [
+        # 2 reinstatements. 1.75 reinstatements used
+        ({'limit': 2.0, 'agg_limit': 6.0, 'reinst_at': 1.0},
+         [2.0, 1.5], 1.75),
+
+        # 2 reinstatements. 1.75 reinstatements used, 50% of premium
+        ({'limit': 2.0, 'agg_limit': 6.0, 'reinst_at': 0.5},
+         [2.0, 1.5], 1.75 * 0.5),
+
+        # 2 reinstatements. 1.75 reinstatements used on layer with xs
+        ({'limit': 2.0, 'xs': 1.0, 'agg_limit': 6.0, 'reinst_at': 1.0},
+         [3.5, 2.5], 1.75),
+
+        # 2.5 reinstatements. 2.25 reinstatements used
+        ({'limit': 2.0, 'agg_limit': 7.0, 'reinst_at': 1.0},
+         [2.0, 2.0, 0.5], 2.25),
+
+        # 2.5 reinstatements. 2.5 reinstatements used
+        ({'limit': 2.0, 'agg_limit': 7.0, 'reinst_at': 1.0},
+         [2.0, 2.0, 1.5], 2.5),
+
+        # 3 reinstatements. 1.5 reinstatements used after agg_xs used
+        ({'limit': 2.0, 'agg_limit': 6.0, 'agg_xs': 1.0, 'reinst_at': 1.0},
+         [2.0, 2.0], (0.5 + 1.0)),
+
+        # No reinstatemnts because limit is same as agg limit
+        ({'limit': 2.0, 'agg_limit': 2.0, 'reinst_at': 1.0},
+         [5.5], 0.0),
+
+        # No reinstatements where limit is more than agg limit
+        ({'limit': 2.0, 'agg_limit': 1.5, 'reinst_at': 1.0},
+         [5.5], 0.0),
+
+        # No reinstatements because reinst rate is zero
+        ({'limit': 2.0, 'agg_limit': 4.0, 'reinst_at': 0.0},
+         [5.5], 0.0),
+    ],
+)
+def test_reinstatements(layer_params, event_losses, expected):
+    """Test we can calculate the coorect reinstatement costs for agg loss to a layer"""
+
+    this_lyr = Layer(**layer_params)
+
+    reinstated_limit = this_lyr.reinstated_limit_in_year(event_losses)
+
+    assert this_lyr.paid_reinstatements(reinstated_limit) == approx(np.array(expected))
+
+    # Test version that takes YELT as input
+    yelt = (pd.Series(event_losses, name='Loss').rename_axis('EventId')
+            .to_frame().assign(Year=1).set_index('Year', append=True)['Loss']
+    )
+    yelt.attrs['n_yrs'] = 1
+
+    reinstated_limit_v2 = this_lyr.ceded_ylt(yelt, only_reinstated=True)
+    assert this_lyr.paid_reinstatements(reinstated_limit_v2).iloc[0] == approx(expected)
 
 
 @pytest.mark.parametrize(
-    "limit, reinst_rates, agg_loss, expected",
+    "layer_params, reinst_rates, event_loss, expected_loss, expected_reinst",
     [
-        # 3 reinstatements with first free. 2.75 reinstatements used
-        (2.0, [0.0, 0.075, 0.075], 5.5, 2.0*0.0 + 2.0*0.075 + 1.5*0.075),
+        # 3 reinstatements with first free. 1.75 reinstatements used
+        ({'limit': 2.0, 'xs': 1.0, }, [0.0, 1.0, 0.5], [3.0, 2.5], 3.5, 0.75),
+        # 3 reinstatements, first free, 3 event losses using partial reinstatements
+        ({'limit': 2.0, 'xs': 1.0, }, [0.0, 1.0, 1.0], [3.0, 2.5, 2.0, 1.0], 4.5, 1.25),
+        # 3 reinstatements, first free, 3 event losses using all reinstatements
+        ({'limit': 1.0, 'xs': 1.0, }, [0.0, 1.0, 1.0], [3.0, 2.5, 2.0, 2.0], 4.0, 2.0),
+        # 2 reinstatements, second free. 3 event losses using all reinst
+        ({'limit': 2.0, 'xs': 1.0, }, [1.0, 0.0], [3.0, 2.5, 2.0], 4.5, 1.0),
     ],
 )
-def test_variable_reinst_cost(limit, reinst_rates, agg_loss, expected):
+def test_variable_reinst_cost(layer_params, reinst_rates, event_loss, expected_loss,
+                              expected_reinst):
     """Test we can calculate the coorect reinstatement costs for agg loss to a layer"""
 
-    this_lyr = MultiLayer.from_variable_reinst_lyr_params(
-        limit, reinst_rates=reinst_rates)
+    layers = variable_reinst_layer(**layer_params, reinst_at=reinst_rates)
+
+    reinstated_losses = [l.reinstated_limit_in_year(event_loss) for l in layers]
+
+    # Avoid double counting by taking only the reinstated part from the first layers
+    losses = reinstated_losses[:-1] + [layers[-1].ceded_loss_in_year(event_loss)]
+
+
+
+    paid_reinst = [l.paid_reinstatements(x) for l, x in zip(layers, reinstated_losses)]
+
+    # print({'losses': losses})
+    # print({'reinst losses': reinstated_losses})
+    # print({'paid_reinst': paid_reinst})
+
+    assert sum(losses) == approx(expected_loss)
+    assert sum(paid_reinst) == approx(expected_reinst)
 
     assert this_lyr.reinst_cost(agg_loss) == approx(expected)
